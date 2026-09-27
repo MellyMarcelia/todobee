@@ -5,7 +5,6 @@ node_modules/
 dist/
 dist-electron/
 out/
-build/
 release/
 
 # Environment
@@ -50,3 +49,6 @@ Thumbs.db
 
 # Coverage
 coverage/
+
+# Local test vault output (created when pointing the app at this repo dir during dev)
+/Todobee/
