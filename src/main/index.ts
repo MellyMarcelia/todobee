@@ -1,9 +1,10 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { getDb } from './db'
 import { runLaunchRollover } from './rollover'
+import { getVaultStatus, setVaultPath } from './settingsRepo'
 import {
   listTasksForNote,
   createTask,
@@ -102,6 +103,23 @@ app.whenReady().then(() => {
     setTaskStatus(taskId, status)
   )
   ipcMain.handle('tasks:delete', (_event, taskId: number) => deleteTask(taskId))
+
+  // Milestone 5: Settings + vault folder picker. getStatus returns both the
+  // saved path and whether it currently exists on disk (the folder could
+  // have been moved/deleted since it was chosen) so the renderer can pick
+  // the right warning banner. chooseFolder opens the native macOS folder
+  // picker and saves the result; it resolves to null if the user cancels.
+  ipcMain.handle('vault:getStatus', () => getVaultStatus(getDb()))
+  ipcMain.handle('vault:chooseFolder', async () => {
+    const mainWindow = BrowserWindow.getFocusedWindow()
+    const result = mainWindow
+      ? await dialog.showOpenDialog(mainWindow, { properties: ['openDirectory', 'createDirectory'] })
+      : await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] })
+    if (result.canceled || result.filePaths.length === 0) return null
+    const chosenPath = result.filePaths[0]
+    setVaultPath(getDb(), chosenPath)
+    return getVaultStatus(getDb())
+  })
 
   // Dev-only: lets the renderer's "simulate next day" button advance the
   // app's notion of "today" by one day and immediately re-run rollover, so

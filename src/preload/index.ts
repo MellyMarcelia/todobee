@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
-import type { Note, Task, NewTask, TaskStatus } from '../shared/types'
+import type { Note, Task, NewTask, TaskStatus, VaultStatus } from '../shared/types'
 
 // Custom API for the renderer — today's note + task CRUD (Milestone 2),
 // extended with launch rollover (Milestone 4). Each function just forwards
@@ -26,6 +26,10 @@ const api = {
   setTaskStatus: (taskId: number, status: TaskStatus): Promise<Task> =>
     ipcRenderer.invoke('tasks:setStatus', taskId, status),
   deleteTask: (taskId: number): Promise<void> => ipcRenderer.invoke('tasks:delete', taskId),
+  // Milestone 5: Settings + vault folder picker.
+  getVaultStatus: (): Promise<VaultStatus> => ipcRenderer.invoke('vault:getStatus'),
+  chooseVaultFolder: (): Promise<VaultStatus | null> =>
+    ipcRenderer.invoke('vault:chooseFolder'),
   // Dev-only: advances the app's simulated "today" by one day and re-runs
   // rollover, so rollover can be tested without waiting for a real day to
   // pass. Only exposed in `npm run dev` — never present in a packaged build.

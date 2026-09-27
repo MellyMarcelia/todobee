@@ -1,8 +1,11 @@
 <script setup lang="ts">
+import { ref, onMounted } from 'vue'
 import Bee from '../components/Bee.vue'
 import PinIcon from '../components/icons/PinIcon.vue'
+import GearIcon from '../components/icons/GearIcon.vue'
+import type { VaultStatus } from '../../../shared/types'
 
-defineEmits<{ open: [] }>()
+defineEmits<{ open: []; 'open-settings': [] }>()
 
 // Placeholder notes for the board — Milestone 7 replaces this with real history data.
 const placeholderNotes = [
@@ -10,12 +13,43 @@ const placeholderNotes = [
   { color: '#9FD8A3', pin: '#4A90D9' },
   { color: '#F2A6C4', pin: '#E9A23B' }
 ]
+
+// Milestone 5: show a warning banner when no vault is chosen yet, or when
+// the previously-chosen vault folder can no longer be found. The app still
+// works normally either way — this is just a nudge to visit Settings.
+const vaultStatus = ref<VaultStatus | null>(null)
+
+async function loadVaultStatus(): Promise<void> {
+  try {
+    vaultStatus.value = await window.api.getVaultStatus()
+  } catch (error) {
+    console.error('Failed to load vault status:', error)
+  }
+}
+
+onMounted(loadVaultStatus)
 </script>
 
 <template>
   <div class="board-screen">
     <section class="board">
-      <h2 class="board-title">your hive board :)</h2>
+      <div class="board-header">
+        <h2 class="board-title">your hive board :)</h2>
+        <button
+          class="settings-button"
+          aria-label="Settings"
+          @click="$emit('open-settings')"
+        >
+          <GearIcon />
+        </button>
+      </div>
+
+      <p v-if="vaultStatus && !vaultStatus.path" class="warning-banner">
+        Choose your Obsidian vault in Settings so your tasks get logged
+      </p>
+      <p v-else-if="vaultStatus && !vaultStatus.exists" class="warning-banner">
+        Your vault folder can't be found, choose it again
+      </p>
 
       <div class="notes-row">
         <button
@@ -54,7 +88,8 @@ const placeholderNotes = [
 }
 
 .board {
-  flex: 0 0 55%;
+  flex: 1 1 55%;
+  min-height: 0;
   margin: 20px 20px 0;
   padding: 20px 18px;
   background: var(--color-board);
@@ -62,8 +97,38 @@ const placeholderNotes = [
   border-radius: var(--radius-board);
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  overflow: hidden;
+  gap: 14px;
+  overflow-y: auto;
+}
+
+.board-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.settings-button {
+  position: absolute;
+  right: 0;
+  top: -2px;
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: transparent;
+  color: #fff8ea;
+  padding: 0;
+  cursor: pointer;
+}
+
+.warning-banner {
+  background: #fff3d6;
+  border: var(--outline-width) solid var(--color-honey);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 0.75rem;
+  color: var(--color-text);
+  text-align: center;
 }
 
 .board-title {
@@ -128,13 +193,13 @@ const placeholderNotes = [
 
 .desk {
   position: relative;
-  flex: 0 0 45%;
+  flex: 0 0 220px;
   overflow: hidden;
 }
 
 .bee-at-desk {
   position: absolute;
   right: 24px;
-  bottom: 60px;
+  bottom: 12px;
 }
 </style>

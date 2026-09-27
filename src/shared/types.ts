@@ -30,3 +30,12 @@ export interface Task {
 export interface NewTask {
   title: string
 }
+
+/**
+ * The saved Obsidian vault folder, plus whether it currently exists on disk.
+ * `path` is null until the user has chosen a folder in Settings at least once.
+ */
+export interface VaultStatus {
+  path: string | null
+  exists: boolean
+}
