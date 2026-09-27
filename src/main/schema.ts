@@ -10,6 +10,8 @@ export function createSchema(db: Database.Database): void {
       note_date TEXT NOT NULL UNIQUE,
       sealed INTEGER NOT NULL DEFAULT 0,
       perfect_day INTEGER NOT NULL DEFAULT 0,
+      board_x REAL,
+      board_y REAL,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -34,5 +36,13 @@ export function createSchema(db: Database.Database): void {
   const hasSealed = columns.some((column) => column.name === 'sealed')
   if (!hasSealed) {
     db.exec('ALTER TABLE notes ADD COLUMN sealed INTEGER NOT NULL DEFAULT 0')
+  }
+  const hasBoardX = columns.some((column) => column.name === 'board_x')
+  if (!hasBoardX) {
+    db.exec('ALTER TABLE notes ADD COLUMN board_x REAL')
+  }
+  const hasBoardY = columns.some((column) => column.name === 'board_y')
+  if (!hasBoardY) {
+    db.exec('ALTER TABLE notes ADD COLUMN board_y REAL')
   }
 }

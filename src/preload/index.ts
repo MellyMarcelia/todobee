@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
-import type { Note, Task, NewTask, TaskStatus, VaultStatus } from '../shared/types'
+import type { Note, Task, NewTask, TaskStatus, VaultStatus, WeekResult } from '../shared/types'
 
 // Custom API for the renderer — today's note + task CRUD (Milestone 2),
 // extended with launch rollover (Milestone 4). Each function just forwards
@@ -26,6 +26,15 @@ const api = {
   setTaskStatus: (taskId: number, status: TaskStatus): Promise<Task> =>
     ipcRenderer.invoke('tasks:setStatus', taskId, status),
   deleteTask: (taskId: number): Promise<void> => ipcRenderer.invoke('tasks:delete', taskId),
+  // Milestone 7: history board.
+  listNotesForWeek: (weekOffset: number): Promise<WeekResult> =>
+    ipcRenderer.invoke('notes:listWeek', weekOffset),
+  getNoteByDate: (noteDate: string): Promise<Note | null> =>
+    ipcRenderer.invoke('notes:getByDate', noteDate),
+  moveTaskToToday: (taskId: number): Promise<Task> =>
+    ipcRenderer.invoke('tasks:moveToToday', taskId),
+  setNotePosition: (noteId: number, x: number, y: number): Promise<void> =>
+    ipcRenderer.invoke('notes:setPosition', noteId, x, y),
   // Milestone 5: Settings + vault folder picker.
   getVaultStatus: (): Promise<VaultStatus> => ipcRenderer.invoke('vault:getStatus'),
   chooseVaultFolder: (): Promise<VaultStatus | null> =>

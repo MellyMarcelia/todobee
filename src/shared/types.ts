@@ -12,6 +12,9 @@ export interface Note {
   sealed: boolean
   /** True once every task on this note was completed at least once (the "perfect day" badge). */
   perfectDay: boolean
+  /** Pixel position on the board, if the user has dragged this note. Null until first dragged — the board then falls back to its default pinned layout. */
+  boardX: number | null
+  boardY: number | null
   createdAt: string
 }
 
@@ -29,6 +32,17 @@ export interface Task {
 /** Input shape for creating a task — no id/status/createdAt, the database assigns those. */
 export interface NewTask {
   title: string
+}
+
+/**
+ * A single week of history (Monday-to-Sunday) plus a label for the arrow
+ * navigation, e.g. "week 39". weekOffset 0 is the current week, -1 is last
+ * week, etc. — the board passes this straight back in to page between weeks.
+ */
+export interface WeekResult {
+  notes: Note[]
+  weekLabel: string
+  weekOffset: number
 }
 
 /**

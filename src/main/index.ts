@@ -6,13 +6,16 @@ import { getDb } from './db'
 import { runLaunchRollover } from './rollover'
 import { getVaultStatus, setVaultPath } from './settingsRepo'
 import { appendTaskEvent } from './obsidianLogger'
+import { listNotesForWeek, getNoteByDate, setNotePosition } from './notesRepo'
+import { formatDateString, parseDateString, addDays, mondayOf, formatShortDate } from './dateUtils'
 import {
   listTasksForNote,
   getTaskById,
   createTask,
   updateTaskTitle,
   setTaskStatus,
-  deleteTask
+  deleteTask,
+  moveTaskToNote
 } from './tasksRepo'
 import type { NewTask } from '../shared/types'
 
@@ -154,6 +157,43 @@ app.whenReady().then(() => {
         title: task.title
       })
     }
+  })
+
+  // Milestone 7: history board. weekOffset 0 = the week containing today,
+  // -1 = the previous week, etc. — max 7 notes per week since each week has
+  // at most one note per calendar day. Label is the week's date range
+  // (e.g. "Sep 28 – Oct 4") rather than a week number, since dates read more
+  // naturally than "week 39" at a glance.
+  ipcMain.handle('notes:listWeek', (_event, weekOffset: number) => {
+    const today = parseDateString(currentAppDateString())
+    const monday = addDays(mondayOf(today), weekOffset * 7)
+    const sunday = addDays(monday, 6)
+    const notes = listNotesForWeek(getDb(), formatDateString(monday), formatDateString(sunday))
+    return {
+      notes,
+      weekLabel: `${formatShortDate(monday)} – ${formatShortDate(sunday)}`,
+      weekOffset
+    }
+  })
+  ipcMain.handle('notes:getByDate', (_event, noteDate: string) => getNoteByDate(getDb(), noteDate))
+  ipcMain.handle('notes:setPosition', (_event, noteId: number, x: number, y: number) =>
+    setNotePosition(getDb(), noteId, x, y)
+  )
+
+  // Reopening a done task on a past (read-only) note, after the user
+  // confirms "move this task to today?". Moves the task onto today's note,
+  // reopens it, and logs a task.reopened line — same event type as
+  // reopening a task in place, since from the log's point of view the task
+  // just became open again (its new note is implied by today's date).
+  ipcMain.handle('tasks:moveToToday', (_event, taskId: number) => {
+    const today = rolloverAndLog(currentAppDateString())
+    const moved = moveTaskToNote(taskId, today.id)
+    appendTaskEvent(getVaultStatus(getDb()).path, {
+      type: 'task.reopened',
+      status: moved.status,
+      title: moved.title
+    })
+    return moved
   })
 
   // Milestone 5: Settings + vault folder picker. getStatus returns both the

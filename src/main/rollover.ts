@@ -12,6 +12,8 @@ interface NoteRow {
   note_date: string
   sealed: number
   perfect_day: number
+  board_x: number | null
+  board_y: number | null
   created_at: string
 }
 
@@ -21,6 +23,8 @@ function toNote(row: NoteRow): Note {
     noteDate: row.note_date,
     sealed: row.sealed === 1,
     perfectDay: row.perfect_day === 1,
+    boardX: row.board_x,
+    boardY: row.board_y,
     createdAt: row.created_at
   }
 }
