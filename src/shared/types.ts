@@ -3,12 +3,24 @@
 // "shape of the data" descriptions — this is the beginner-friendly level of
 // TypeScript the project intentionally sticks to.
 
-/** A single day's note. One row per calendar day. */
+/** The default title/colour every new day starts with, and what rollover falls back to. */
+export const DEFAULT_NOTE_TITLE = "today's buzz"
+export const DEFAULT_NOTE_COLOUR = '#F6C56A'
+
+/**
+ * A single post-it note. Milestone 8b: a calendar day can have several of
+ * these (one per post-it the user created), not just one — `noteDate` says
+ * which day it belongs to, `title`/`colour` say which post-it it is.
+ */
 export interface Note {
   id: number
   /** ISO calendar date, e.g. "2026-09-27". */
   noteDate: string
-  /** True once this note is no longer today's note — its unfinished tasks have rolled over and it's read-only history. */
+  /** User-chosen name, e.g. "today's buzz", "School", "Personal". Renamable by clicking it. */
+  title: string
+  /** Hex colour, e.g. "#F6C56A", chosen when the post-it was created. */
+  colour: string
+  /** True once this note is no longer editable — its unfinished tasks have rolled over and it's read-only history. */
   sealed: boolean
   /** True once every task on this note was completed at least once (the "perfect day" badge). */
   perfectDay: boolean
@@ -16,6 +28,17 @@ export interface Note {
   boardX: number | null
   boardY: number | null
   createdAt: string
+}
+
+/** A note plus how many tasks are on it — what the board needs to show "4 tasks" without a second round-trip per note. */
+export interface BoardNote extends Note {
+  taskCount: number
+}
+
+/** Input shape for creating a new post-it — no id/dates/flags, the database assigns those. */
+export interface NewNote {
+  title: string
+  colour: string
 }
 
 /** A task's completion state. A plain union type — only these two strings are valid. */
@@ -38,9 +61,11 @@ export interface NewTask {
  * One calendar day of history for the board — one day at a time (not a
  * week). dayOffset 0 is today, -1 is yesterday, etc.; canGoForward is false
  * once dayOffset reaches 0, since browsing is never allowed into the future.
+ * Milestone 8b: notes is a list (a day can have several post-its), each
+ * with its own task count for the board's "N tasks" label.
  */
 export interface DayResult {
-  note: Note | null
+  notes: BoardNote[]
   dateLabel: string
   dayOffset: number
   isToday: boolean

@@ -12,7 +12,7 @@ category: prd
 
 Two small, separate, offline desktop apps that share a bee theme and both log their activity into the same Obsidian vault, under separate top-level folders:
 
-- **Todobee** — a cozy sticky-note style to-do list with a bee mascot. One note per day; unfinished tasks roll forward automatically; finished notes become browsable history.
+- **Todobee** — a cozy sticky-note style to-do list with a bee mascot. Each day can have one or more post-it notes (e.g. "today's buzz", "School", "Personal"), each with its own task list; unfinished tasks roll forward automatically per post-it; finished notes become browsable history.
 - **Beemodoro** — a Pomodoro/focus-timer app: drag a snack onto a bee in the middle of the screen to start a focus session. Completed sessions fill a honeycomb, a simple visual history of the semester's focus effort.
 
 Both are independent Electron apps, each with its own local SQLite database, sharing nothing at runtime except writing into the same user-selected Obsidian vault.
@@ -27,56 +27,61 @@ Both are independent Electron apps, each with its own local SQLite database, sha
 
 ### 3.1 Core features
 - Sticky-note style UI with a bee mascot.
-- **One note per day** ("today's note"): all of today's tasks live on one visual note.
-- On launch, the app checks the current date; if it's a new day since last launch, it creates a fresh note for today and **rolls forward any unfinished tasks** from the previous note onto it. No live midnight timer — rollover is computed on launch only.
-- Create, edit, delete, complete, and reopen tasks.
-- **Reopening a task from a past (already-finished) day's note moves it immediately onto today's note** — it does not stay on the old note waiting for a future rollover.
+- **Multiple post-its per day**: a day starts with one default "today's buzz" post-it, and the user can add more via a "+ new post-it" button on the board — picking a colour and typing a title (e.g. "School", "Personal"). Titles can be renamed later by clicking them. Each post-it has its own independent task list.
+- On launch, the app checks the current date; if it's a new day since last launch, it creates a fresh default "today's buzz" post-it and **rolls forward any unfinished tasks** from the previous day's post-its onto matching (same title + colour) post-its on the new day. No live midnight timer — rollover is computed on launch only.
+- A post-it that had nothing unfinished on it isn't recreated the next day — it stays in history as a sealed note, but doesn't carry forward as an active post-it.
+- Create, edit, delete, complete, and reopen tasks, scoped to whichever post-it they're on.
+- **Reopening a task from a past (already-finished) day's post-it moves it immediately onto a same-title-and-colour post-it on today** (created if one doesn't already exist) — it does not stay on the old post-it waiting for a future rollover.
 - Finished notes are kept as **history**, browsable chronologically (oldest to newest).
 - Data persists locally (SQLite) after closing/reopening the app.
 
 ### 3.2 Custom feature: bee rewards
-- When every task on the current note is marked done, the bee mascot plays a one-time **celebration animation**.
-- That day's note additionally gets a small persistent **"perfect day" badge**, visualized as a **"Good job" stamp graphic overlapping the note** (per hand-drawn concept sketch), visible when browsing history later.
-- No points, currency, streak counter, or gamified economy — just the animation (transient) and the stamp/badge (persistent, computed from "were all tasks on this note completed").
+- When every task on a post-it is marked done, the bee mascot plays a one-time **celebration animation**.
+- That post-it additionally gets a small persistent **"perfect day" badge**, visualized as a **"Good job" stamp graphic overlapping the note** (per hand-drawn concept sketch), visible when browsing history later — and shown as a tiny stamp on its board pin.
+- No points, currency, streak counter, or gamified economy — just the animation (transient) and the stamp/badge (persistent, computed per-post-it from "were all tasks on this post-it completed").
 
 ### 3.3 History view
-- The corkboard is the **home screen**: launching Todobee opens directly onto the board, not onto today's note.
+- The corkboard is the **home screen**: launching Todobee opens directly onto the board, not onto a note.
 - The board is browsed **one day at a time**: the header shows a single date (e.g. "Sun 27 Sep 2026") with `‹ ›` arrows to move one day back/forward — forward paging is capped at today, since there's never a future day to look at.
-- The board shows that day's post-it pinned on the corkboard. On today's day it's labeled "today" and fully editable; on a past day it's read-only.
-- Each pinned note shows a **tiny "Good job" stamp** on its board thumbnail if that day earned a "perfect day" badge.
+- The board shows **every post-it pinned on that day**, each labeled with its own title and task count (e.g. "4 tasks"). On today's day, post-its are fully editable and a "+ new post-it" button is available; on a past day, every post-it on it is read-only.
+- Each pinned post-it shows a **tiny "Good job" stamp** on its board thumbnail if it individually earned a "perfect day" badge.
 - The bee mascot sits at a small desk below the board (a static, cozy decorative touch — not interactive), reinforcing the "working bees" theme without adding functional complexity.
-- Clicking **today's** pinned note opens it full-screen as the editable "today's buzz" note (§3.1). Clicking a **past** note opens it full-screen **read-only** — its tasks can be viewed and a done task can be reopened (which moves it to today, see below), but nothing on a past note can otherwise be added, edited, or deleted in place.
-- This board *is* the history feature described in §3.1 — not a separate screen from "today's note" navigation, just the visual presentation of the currently browsed day's note.
+- Clicking **any of today's** pinned post-its opens it full-screen as an editable note (§3.1). Clicking a **past** post-it opens it full-screen **read-only** — its tasks can be viewed and a done task can be reopened (which moves it to a matching post-it on today, see below), but nothing on a past post-it can otherwise be added, edited, or deleted in place.
+- This board *is* the history feature described in §3.1 — not a separate screen from post-it navigation, just the visual presentation of the currently browsed day's post-its.
 
 ### 3.4 Obsidian logging
 - Logs to: `<vault>/Todobee/Tasks/YYYY/YYYY-MM/YYYY-MM-DD.md`
-- Logged events: task created / edited / completed / reopened / deleted (including the rollover of a task from one day's note to the next, logged as a normal edit/move on the origin day, not a duplicate creation).
+- Logged events: task created / edited / completed / reopened / deleted (including the rollover of a task from one day's post-it to the next, logged as a normal edit/move on the origin day, not a duplicate creation).
+- Every log line includes which post-it the task belongs to, e.g. `— Note: "School"`.
 - One append-only file per day; never overwritten.
 
 ### 3.5 Testable acceptance criteria
-- [ ] Creating a task adds it to today's note and to SQLite; restarting the app still shows it.
-- [ ] Editing a task's title/details updates it in place; a `task.edited` entry is appended to the vault log.
-- [ ] Completing a task marks it done on today's note; a `task.completed` entry is appended.
-- [ ] Reopening a task from a past, already-finished note removes it from that note's completed state and places it on **today's** note; a `task.reopened` entry is appended.
-- [ ] Reopening a task that was completed **on today's own note** (not rolled over from a past day) simply marks it open again in place on today's note; a `task.reopened` entry is appended.
-- [ ] Deleting a task removes it from its note; a `task.deleted` entry is appended; deletion is never silently unlogged.
-- [ ] Launching the app on a new calendar day (vs. the last recorded launch date) automatically creates a new daily note and moves any unfinished tasks from the previous note onto it, without requiring the app to have been left running overnight.
+- [ ] Creating a task adds it to the chosen post-it and to SQLite; restarting the app still shows it.
+- [ ] Editing a task's title/details updates it in place; a `task.edited` entry (including the post-it's title) is appended to the vault log.
+- [ ] Completing a task marks it done on its post-it; a `task.completed` entry is appended.
+- [ ] Reopening a task from a past, already-finished post-it removes it from that post-it's completed state and places it on a **same-title-and-colour post-it on today** (created if none exists yet); a `task.reopened` entry is appended.
+- [ ] Reopening a task that was completed **on one of today's own post-its** (not rolled over from a past day) simply marks it open again in place on that post-it; a `task.reopened` entry is appended.
+- [ ] Deleting a task removes it from its post-it; a `task.deleted` entry is appended; deletion is never silently unlogged.
+- [ ] Launching the app on a new calendar day (vs. the last recorded launch date) automatically creates a fresh default "today's buzz" post-it and moves any unfinished tasks from each of the previous day's post-its onto a matching (same title + colour) post-it on the new day, without requiring the app to have been left running overnight.
+- [ ] A post-it with no unfinished tasks on it is **not** recreated the next day — it stays as sealed history but doesn't carry forward as an active post-it.
 - [ ] Each task rolled over to a new day is logged in **today's** log file (not the origin day's file) as a `task.edited` entry whose details note "moved from YYYY-MM-DD" (the origin day's date) — never a duplicate `task.created`.
-- [ ] Launching the app twice on the same calendar day does not create a duplicate daily note or duplicate/roll over tasks a second time.
-- [ ] Marking the last remaining open task on today's note as done triggers the bee's celebration animation exactly once and marks that day's note with a persistent "Good job" stamp/"perfect day" badge.
-- [ ] Reopening any task on a note that previously earned a "perfect day" badge removes that badge/stamp (the day is no longer "all done").
-- [ ] Browsing the history board by paging day-by-day shows each past day's note, its tasks, and, where applicable, its "Good job" stamp, with the bee mascot visible at its desk below the board.
-- [ ] All task data (including rollover state and badges) survives a full app restart.
-- [ ] Launching the app opens directly onto the board (home screen), not onto today's note.
+- [ ] Launching the app twice on the same calendar day does not create a duplicate default post-it or roll over tasks a second time.
+- [ ] Marking the last remaining open task on a post-it as done triggers the bee's celebration animation exactly once and marks that post-it with a persistent "Good job" stamp/"perfect day" badge.
+- [ ] Reopening any task on a post-it that previously earned a "perfect day" badge removes that badge/stamp (the post-it is no longer "all done"); adding a new task to a stamped post-it also removes the badge/stamp.
+- [ ] Browsing the history board by paging day-by-day shows every post-it pinned on each past day, their tasks, and, where applicable, their "Good job" stamps, with the bee mascot visible at its desk below the board.
+- [ ] All task and post-it data (including rollover state and badges) survives a full app restart.
+- [ ] Launching the app opens directly onto the board (home screen), not onto a note.
 - [ ] The board is browsed one day at a time: the header shows a single date (e.g. "Sun 27 Sep 2026") with `‹ ›` arrows to move one day back/forward; forward paging is disabled once the currently browsed day is today, so the board can never show a future day.
-- [ ] On today's day, the board's pinned note is labeled "today" and is editable; on a past day, the pinned note is read-only.
-- [ ] Each pinned note on the board shows a tiny stamp graphic if and only if that day earned a "perfect day" badge.
-- [ ] Clicking today's pinned note opens it full-screen as the editable "today's buzz" note.
-- [ ] Clicking a past (non-today) pinned note opens it full-screen, read-only: its tasks are visible but cannot be added, edited, or deleted from that view — only a done task's reopen action is available.
-- [ ] On today's note, adding a task via the "tap to add…" row, ticking a task's checkbox, clicking a task to edit it, and revealing a small ✕ to delete a task on hover all work as described and match the existing create/edit/complete/delete acceptance criteria above.
-- [ ] Ticking the last remaining open task on today's note shows both the "Good job" stamp and switches the bee to its happy pose (celebration), matching the existing "perfect day" acceptance criterion above.
-- [ ] Clicking the folded-corner ✓ on today's note ("done for now") animates the note back onto the board and pins it there; it does **not** mark the note as finished, does not delete anything, and any tasks left unfinished on it still roll over normally on the next day's launch (per the rollover acceptance criteria above).
-- [ ] On a read-only past note, reopening a done task shows a confirmation ("Move this task to today?") before acting; confirming moves the task to today's note (per the existing reopen-from-history acceptance criterion), and declining leaves the past note unchanged.
+- [ ] On today's day, every pinned post-it is editable and a "+ new post-it" button is available; on a past day, every pinned post-it is read-only.
+- [ ] Each pinned post-it on the board shows its title and task count (e.g. "4 tasks"), and a tiny stamp graphic if and only if it earned a "perfect day" badge.
+- [ ] Clicking a "+ new post-it" button on today's board, choosing a colour, and typing a title creates a new post-it on today with an empty task list, pinned on the board.
+- [ ] Clicking a post-it's title while viewing it (on an editable, today's post-it) lets the user rename it; the new title is saved and used by future rollover matching.
+- [ ] Clicking one of today's pinned post-its opens it full-screen as an editable note.
+- [ ] Clicking a past (non-today) pinned post-it opens it full-screen, read-only: its tasks are visible but cannot be added, edited, or deleted from that view — only a done task's reopen action is available.
+- [ ] On an editable post-it, adding a task via the "tap to add…" row, ticking a task's checkbox, clicking a task to edit it, and revealing a small ✕ to delete a task on hover all work as described and match the existing create/edit/complete/delete acceptance criteria above.
+- [ ] Ticking the last remaining open task on a post-it shows both the "Good job" stamp and switches the bee to its happy pose (celebration), matching the existing "perfect day" acceptance criterion above.
+- [ ] Clicking the folded-corner ✓ on an editable post-it ("done for now") animates the note back onto the board and pins it there; it does **not** mark the note as finished, does not delete anything, and any tasks left unfinished on it still roll over normally on the next day's launch (per the rollover acceptance criteria above).
+- [ ] On a read-only past post-it, reopening a done task shows a confirmation ("Move this task to today?") before acting; confirming moves the task to a matching post-it on today (per the existing reopen-from-history acceptance criterion), and declining leaves the past post-it unchanged.
 - [ ] A Settings (⚙️) button and a Help (?) button are both present and reachable from the board; the Settings button opens the vault folder picker (§7).
 
 ## 4. Beemodoro (Pomodoro app)
@@ -169,15 +174,16 @@ The bee's animation/pose changes with session state:
 ## 6. Main user flows
 
 ### 6.1 Todobee
-1. **Launch app.** App checks today's date against the last note's date; if a new day, creates today's note and rolls forward any unfinished tasks from the previous note. The app opens directly on the **board** (home screen), showing today's date with its pinned note, labeled "today"; the bee sits at the desk below.
-2. **Open today's note.** Clicking today's pinned note opens it full-screen as "today's buzz": add tasks via a "tap to add…" row, tick a task's checkbox to complete it, click a task to edit it, or reveal a small ✕ on hover to delete it.
-3. **All done.** Ticking the last open task on today's note shows the "Good job" stamp and switches the bee to its happy pose (celebration).
-4. **Done for now.** Clicking the folded-corner ✓ on today's note flies the note back onto the board and pins it there — this is a "put it away for now" action, not a finish/complete action: it doesn't delete or seal anything, and any tasks still unfinished on it roll over normally on the next day's launch.
-5. **Next day.** On next launch, any tasks left unfinished roll onto the new day's note; the previous day's note becomes read-only history, still showing its stamp if it earned one.
-6. **Review history.** Browse the board one day at a time with the `‹ ›` arrows (capped at today); each stamped day shows a tiny "Good job" stamp on its pin.
-7. **Open a past note.** Clicking a past (non-today) pinned note opens it full-screen, read-only — its tasks are visible but nothing can be added/edited/deleted directly on it.
-8. **Reopen from history.** On a read-only past note, reopening a done task prompts "Move this task to today?"; confirming pulls it onto today's note instead of resurrecting the old one, and declining leaves the past note untouched.
-9. **Settings and help.** A small ⚙️ Settings button (vault folder picker, §7) and a ? Help button are reachable from the board at all times.
+1. **Launch app.** App checks today's date against the last recorded launch date; if a new day, creates a fresh default "today's buzz" post-it and rolls forward any unfinished tasks from each of the previous day's post-its onto matching (same title + colour) post-its. The app opens directly on the **board** (home screen), showing today's date with all of today's post-its pinned; the bee sits at the desk below.
+2. **Open a post-it.** Clicking any of today's pinned post-its opens it full-screen: add tasks via a "tap to add…" row, tick a task's checkbox to complete it, click a task to edit it, or reveal a small ✕ on hover to delete it. Clicking the post-it's own title lets you rename it.
+3. **Add another post-it.** A "+ new post-it" button on today's board lets you pick a colour and type a title (e.g. "School", "Personal"), pinning a new, empty post-it on today.
+4. **All done.** Ticking the last open task on a post-it shows the "Good job" stamp and switches the bee to its happy pose (celebration) — per post-it, independently of any other post-it that day.
+5. **Done for now.** Clicking the folded-corner ✓ on an editable post-it flies it back onto the board and pins it there — this is a "put it away for now" action, not a finish/complete action: it doesn't delete or seal anything, and any tasks still unfinished on it roll over normally on the next day's launch.
+6. **Next day.** On next launch, any tasks left unfinished on each post-it roll onto a matching post-it on the new day; post-its with nothing unfinished are not recreated. The previous day's post-its become read-only history, still showing their stamps if they earned one.
+7. **Review history.** Browse the board one day at a time with the `‹ ›` arrows (capped at today); each stamped post-it shows a tiny "Good job" stamp on its pin, alongside its title and task count.
+8. **Open a past post-it.** Clicking a past (non-today) pinned post-it opens it full-screen, read-only — its tasks are visible but nothing can be added/edited/deleted directly on it.
+9. **Reopen from history.** On a read-only past post-it, reopening a done task prompts "Move this task to today?"; confirming pulls it onto a matching post-it on today (created if none exists yet) instead of resurrecting the old one, and declining leaves the past post-it untouched.
+10. **Settings and help.** A small ⚙️ Settings button (vault folder picker, §7) and a ? Help button are reachable from the board at all times.
 
 ### 6.2 Beemodoro
 1. **Launch app.** Bee sits idle in the center; snack tray is visible on the right.
@@ -223,7 +229,7 @@ Alternative considered but not chosen: **PGlite** (Postgres-in-WASM) — appeali
 - The log is a write-only export layer in both apps — neither app ever reads its own or the other app's log back; each app's SQLite database remains its sole authoritative source.
 
 **Screen layout:**
-- Todobee: the **board is the home screen**. It shows one day's pinned note at a time — labeled "today" on today's day — with `‹ ›` arrows at the top to page one day back/forward (capped at today), and the static bee-at-a-desk illustration underneath. Clicking today's pin opens the editable "today's buzz" full-screen note (task list with a "tap to add…" row, checkboxes, click-to-edit, hover-to-reveal ✕ delete, and a folded-corner ✓ that returns the note to the board without finishing/sealing it). Clicking a past pin opens the same full-screen note layout **read-only**, with only a reopen-to-today action available on its done tasks (confirmed via a "Move this task to today?" prompt). A small ⚙️ Settings button (vault folder picker) and a ? Help button are reachable from the board.
+- Todobee: the **board is the home screen**. It shows one day's pinned post-its at a time — every post-it that day has, each labeled with its own title and task count — with `‹ ›` arrows at the top to page one day back/forward (capped at today), and the static bee-at-a-desk illustration underneath. On today's day, a "+ new post-it" button (colour picker + title) is also available. Clicking any of today's pins opens the corresponding editable full-screen post-it (task list with a "tap to add…" row, checkboxes, click-to-edit, hover-to-reveal ✕ delete, click-to-rename title, and a folded-corner ✓ that returns the note to the board without finishing/sealing it). Clicking a past pin opens the same full-screen note layout **read-only**, with only a reopen-to-today action available on its done tasks (confirmed via a "Move this task to today?" prompt). A small ⚙️ Settings button (vault folder picker) and a ? Help button are reachable from the board.
 - Beemodoro: the bee's area sits center-left and doubles as both the idle bee display and the running session's focus/timer view (progress bar, animation, countdown, controls) — no separate screen/route needed to switch between them; a snack tray is docked to the right for dragging; the honeycomb/list history and lifetime stats line are reachable via a dedicated view (e.g. a tab or panel below/beside the main timer screen).
 
 **Usability decisions:**

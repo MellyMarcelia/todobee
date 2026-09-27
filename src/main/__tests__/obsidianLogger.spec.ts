@@ -32,32 +32,38 @@ describe('formatTimestamp', () => {
 describe('formatLogLine', () => {
   it('starts with a markdown bullet ("- ")', () => {
     const line = formatLogLine(
-      { type: 'task.created', status: 'open', title: 'kerjain pr' },
+      { type: 'task.created', status: 'open', title: 'kerjain pr', noteTitle: "today's buzz" },
       FIXED_INSTANT,
       'Europe/Brussels'
     )
     expect(line.startsWith('- ')).toBe(true)
   })
 
-  it('matches the exact bullet format from the spec', () => {
+  it('matches the exact bullet format from the spec, including the note title', () => {
     const line = formatLogLine(
-      { type: 'task.created', status: 'open', title: 'kerjain pr' },
+      { type: 'task.created', status: 'open', title: 'kerjain pr', noteTitle: 'School' },
       FIXED_INSTANT,
       'Europe/Brussels'
     )
     expect(line).toBe(
-      '- **2026-09-27 19:30:12 (Europe/Brussels, UTC+02:00)** — `task.created` — Status: open — "kerjain pr"'
+      '- **2026-09-27 19:30:12 (Europe/Brussels, UTC+02:00)** — `task.created` — Status: open — "kerjain pr" — Note: "School"'
     )
   })
 
   it('appends a "moved from" note for rollover-triggered edits', () => {
     const line = formatLogLine(
-      { type: 'task.edited', status: 'open', title: 'kerjain pr', movedFrom: '2026-09-26' },
+      {
+        type: 'task.edited',
+        status: 'open',
+        title: 'kerjain pr',
+        noteTitle: "today's buzz",
+        movedFrom: '2026-09-26'
+      },
       FIXED_INSTANT,
       'Europe/Brussels'
     )
     expect(line).toBe(
-      '- **2026-09-27 19:30:12 (Europe/Brussels, UTC+02:00)** — `task.edited` — Status: open — "kerjain pr" — moved from 2026-09-26'
+      '- **2026-09-27 19:30:12 (Europe/Brussels, UTC+02:00)** — `task.edited` — Status: open — "kerjain pr" — Note: "today\'s buzz" — moved from 2026-09-26'
     )
   })
 })
@@ -87,7 +93,7 @@ describe('appendTaskEvent', () => {
     vaultDir = mkdtempSync(join(tmpdir(), 'todobee-vault-'))
     appendTaskEvent(
       vaultDir,
-      { type: 'task.created', status: 'open', title: 'kerjain pr' },
+      { type: 'task.created', status: 'open', title: 'kerjain pr', noteTitle: "today's buzz" },
       FIXED_INSTANT,
       'Europe/Brussels'
     )
@@ -95,7 +101,7 @@ describe('appendTaskEvent', () => {
     const filePath = logFilePath(vaultDir, FIXED_INSTANT, 'Europe/Brussels')
     expect(existsSync(filePath)).toBe(true)
     expect(readFileSync(filePath, 'utf-8')).toBe(
-      '- **2026-09-27 19:30:12 (Europe/Brussels, UTC+02:00)** — `task.created` — Status: open — "kerjain pr"\n'
+      '- **2026-09-27 19:30:12 (Europe/Brussels, UTC+02:00)** — `task.created` — Status: open — "kerjain pr" — Note: "today\'s buzz"\n'
     )
   })
 
@@ -103,13 +109,13 @@ describe('appendTaskEvent', () => {
     vaultDir = mkdtempSync(join(tmpdir(), 'todobee-vault-'))
     appendTaskEvent(
       vaultDir,
-      { type: 'task.created', status: 'open', title: 'first task' },
+      { type: 'task.created', status: 'open', title: 'first task', noteTitle: "today's buzz" },
       FIXED_INSTANT,
       'Europe/Brussels'
     )
     appendTaskEvent(
       vaultDir,
-      { type: 'task.completed', status: 'done', title: 'first task' },
+      { type: 'task.completed', status: 'done', title: 'first task', noteTitle: "today's buzz" },
       new Date('2026-09-27T18:00:00.000Z'),
       'Europe/Brussels'
     )
@@ -124,7 +130,11 @@ describe('appendTaskEvent', () => {
 
   it('does nothing and does not throw when no vault path is set', () => {
     expect(() =>
-      appendTaskEvent(null, { type: 'task.created', status: 'open', title: 'x' }, FIXED_INSTANT)
+      appendTaskEvent(
+        null,
+        { type: 'task.created', status: 'open', title: 'x', noteTitle: "today's buzz" },
+        FIXED_INSTANT
+      )
     ).not.toThrow()
   })
 
@@ -132,7 +142,7 @@ describe('appendTaskEvent', () => {
     expect(() =>
       appendTaskEvent(
         '/this/path/does/not/exist/at/all',
-        { type: 'task.created', status: 'open', title: 'x' },
+        { type: 'task.created', status: 'open', title: 'x', noteTitle: "today's buzz" },
         FIXED_INSTANT
       )
     ).not.toThrow()

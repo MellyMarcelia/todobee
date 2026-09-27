@@ -18,6 +18,8 @@ export interface TaskEvent {
   type: TaskEventType
   status: 'open' | 'done'
   title: string
+  /** Which post-it the task lives on, e.g. "today's buzz", "School" — Milestone 8b. */
+  noteTitle: string
   /**
    * Set only for the rollover case: a task.edited event that moved a task
    * onto today's note from an earlier note. Renders as "moved from YYYY-MM-DD".
@@ -92,7 +94,7 @@ export function formatTimestamp(date: Date, timeZone: string): string {
 /** Formats one bullet line for a task event, in the exact spec format. */
 export function formatLogLine(event: TaskEvent, date: Date, timeZone: string): string {
   const timestamp = formatTimestamp(date, timeZone)
-  let line = `- **${timestamp}** — \`${event.type}\` — Status: ${event.status} — "${event.title}"`
+  let line = `- **${timestamp}** — \`${event.type}\` — Status: ${event.status} — "${event.title}" — Note: "${event.noteTitle}"`
   if (event.movedFrom) line += ` — moved from ${event.movedFrom}`
   return line
 }

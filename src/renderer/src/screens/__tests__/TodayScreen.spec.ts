@@ -20,6 +20,8 @@ import type { Note, Task } from '../../../../shared/types'
 const fakeNote: Note = {
   id: 1,
   noteDate: '2026-09-27',
+  title: "today's buzz",
+  colour: '#F6C56A',
   sealed: false,
   perfectDay: false,
   boardX: null,
@@ -35,7 +37,7 @@ describe('TodayScreen — adding a task', () => {
   beforeEach(() => {
     let nextId = 100
     window.api = {
-      getTodayNote: vi.fn().mockResolvedValue(fakeNote),
+      getNoteById: vi.fn().mockResolvedValue(fakeNote),
       listTasks: vi.fn().mockResolvedValue([]),
       createTask: vi
         .fn()
@@ -49,8 +51,8 @@ describe('TodayScreen — adding a task', () => {
   })
 
   it('creates exactly one task when Enter is pressed once', async () => {
-    const wrapper = mount(TodayScreen)
-    await flushPromises() // let onMounted's loadTodayNote resolve
+    const wrapper = mount(TodayScreen, { props: { noteId: fakeNote.id } })
+    await flushPromises() // let onMounted's loadNote resolve
 
     await wrapper.find('.task-text.muted').trigger('click') // "tap to add…"
     const input = wrapper.find('.add-row .task-text-input')
@@ -73,7 +75,7 @@ describe('TodayScreen — adding a task', () => {
   })
 
   it('does not create a task when Enter is pressed on an empty input', async () => {
-    const wrapper = mount(TodayScreen)
+    const wrapper = mount(TodayScreen, { props: { noteId: fakeNote.id } })
     await flushPromises()
 
     await wrapper.find('.task-text.muted').trigger('click')

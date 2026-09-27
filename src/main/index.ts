@@ -6,7 +6,7 @@ import { getDb } from './db'
 import { runLaunchRollover } from './rollover'
 import { getVaultStatus, setVaultPath } from './settingsRepo'
 import { appendTaskEvent } from './obsidianLogger'
-import { getNoteByDate, setNotePosition } from './notesRepo'
+import { listNotesForDate, getNoteById, createNote, updateNoteTitle, setNotePosition } from './notesRepo'
 import { recalculatePerfectDay } from './perfectDay'
 import { parseDateString, addDays, formatDateString, formatLongDate } from './dateUtils'
 import {
@@ -19,6 +19,7 @@ import {
   moveTaskToNote
 } from './tasksRepo'
 import type { NewTask } from '../shared/types'
+import { DEFAULT_NOTE_TITLE, DEFAULT_NOTE_COLOUR } from '../shared/types'
 
 /** Today's date as "YYYY-MM-DD" in the user's local timezone. */
 function todayDateString(): string {
@@ -57,10 +58,27 @@ function rolloverAndLog(dateString: string): ReturnType<typeof runLaunchRollover
       type: 'task.edited',
       status: 'open',
       title: moved.title,
+      noteTitle: moved.noteTitle,
       movedFrom: moved.fromDate
     })
   }
   return result
+}
+
+/**
+ * Finds today's post-it with the given title+colour, or creates one if none
+ * matches yet. Used both by "move this task to today" (find/create a
+ * post-it matching the task's original note) and could be reused anywhere
+ * else that needs "the post-it that continues this one, today".
+ */
+function ensureTodayNoteFor(title: string, colour: string): ReturnType<typeof createNote> {
+  const db = getDb()
+  const todayDate = currentAppDateString()
+  const existing = listNotesForDate(db, todayDate).find(
+    (note) => note.title === title && note.colour === colour
+  )
+  if (existing) return existing
+  return createNote(db, todayDate, title, colour)
 }
 
 function createWindow(): void {
@@ -113,40 +131,47 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  // Today's note + task CRUD (Milestone 2, extended with rollover in
-  // Milestone 4). Each handler is a thin wrapper around tasksRepo/rollover —
-  // the actual SQL lives there, this just wires it to IPC. Milestone 6 adds
-  // one appendTaskEvent call per event, right after the SQL succeeds, using
-  // the current saved vault path — logging failures never throw (see
+  // Task CRUD (Milestone 2, extended with rollover in Milestone 4). Each
+  // handler is a thin wrapper around tasksRepo/notesRepo — the actual SQL
+  // lives there, this just wires it to IPC + logging. Milestone 6 adds one
+  // appendTaskEvent call per event, right after the SQL succeeds, using the
+  // current saved vault path — logging failures never throw (see
   // obsidianLogger.ts), so a bad/missing vault can't break task management.
-  ipcMain.handle('todayNote:get', () => rolloverAndLog(currentAppDateString()))
+  // Milestone 8b: every log line also needs the post-it's title, so each
+  // handler looks up the owning note first.
   ipcMain.handle('tasks:list', (_event, noteId: number) => listTasksForNote(noteId))
   ipcMain.handle('tasks:create', (_event, noteId: number, input: NewTask) => {
     const created = createTask(noteId, input)
     recalculatePerfectDay(getDb(), noteId)
+    const note = getNoteById(getDb(), noteId)
     appendTaskEvent(getVaultStatus(getDb()).path, {
       type: 'task.created',
       status: created.status,
-      title: created.title
+      title: created.title,
+      noteTitle: note?.title ?? DEFAULT_NOTE_TITLE
     })
     return created
   })
   ipcMain.handle('tasks:updateTitle', (_event, taskId: number, title: string) => {
     const updated = updateTaskTitle(taskId, title)
+    const note = getNoteById(getDb(), updated.noteId)
     appendTaskEvent(getVaultStatus(getDb()).path, {
       type: 'task.edited',
       status: updated.status,
-      title: updated.title
+      title: updated.title,
+      noteTitle: note?.title ?? DEFAULT_NOTE_TITLE
     })
     return updated
   })
   ipcMain.handle('tasks:setStatus', (_event, taskId: number, status: 'open' | 'done') => {
     const updated = setTaskStatus(taskId, status)
     recalculatePerfectDay(getDb(), updated.noteId)
+    const note = getNoteById(getDb(), updated.noteId)
     appendTaskEvent(getVaultStatus(getDb()).path, {
       type: status === 'done' ? 'task.completed' : 'task.reopened',
       status: updated.status,
-      title: updated.title
+      title: updated.title,
+      noteTitle: note?.title ?? DEFAULT_NOTE_TITLE
     })
     return updated
   })
@@ -155,53 +180,73 @@ app.whenReady().then(() => {
     deleteTask(taskId)
     if (task) {
       recalculatePerfectDay(getDb(), task.noteId)
+      const note = getNoteById(getDb(), task.noteId)
       appendTaskEvent(getVaultStatus(getDb()).path, {
         type: 'task.deleted',
         status: task.status,
-        title: task.title
+        title: task.title,
+        noteTitle: note?.title ?? DEFAULT_NOTE_TITLE
       })
     }
   })
 
-  // Milestone 7 (revised): history board, one day at a time. dayOffset 0 is
-  // today, -1 is yesterday, etc. — browsing is capped at today (canGoForward
-  // is false once dayOffset reaches 0) since there's never a future note to
-  // look at. note is null for a day that has no note yet (no tasks were ever
-  // created/rolled onto it).
+  // Milestone 7 (revised) + 8b: history board, one day at a time, showing
+  // every post-it on that day. dayOffset 0 is today, -1 is yesterday, etc.
+  // — browsing is capped at today (canGoForward is false once dayOffset
+  // reaches 0) since there's never a future day to look at. Loading today
+  // (dayOffset 0) runs rollover first so the default post-it and any
+  // carried-over post-its exist before we list them; past days are pure
+  // reads since a sealed day's post-its never change.
   ipcMain.handle('notes:getForDay', (_event, dayOffset: number) => {
     const clampedOffset = Math.min(dayOffset, 0)
     const today = parseDateString(currentAppDateString())
     const date = addDays(today, clampedOffset)
     const dateString = formatDateString(date)
-    const note = getNoteByDate(getDb(), dateString)
+    if (clampedOffset === 0) rolloverAndLog(dateString)
+    const notes = listNotesForDate(getDb(), dateString)
     return {
-      note,
+      notes,
       dateLabel: formatLongDate(date),
       dayOffset: clampedOffset,
       isToday: clampedOffset === 0,
       canGoForward: clampedOffset < 0
     }
   })
-  ipcMain.handle('notes:getByDate', (_event, noteDate: string) => getNoteByDate(getDb(), noteDate))
+  ipcMain.handle('notes:getById', (_event, noteId: number) => getNoteById(getDb(), noteId))
   ipcMain.handle('notes:setPosition', (_event, noteId: number, x: number, y: number) =>
     setNotePosition(getDb(), noteId, x, y)
   )
 
+  // Milestone 8b: "+ new post-it" on the board. Always created on today
+  // (you can only add post-its to the day you're actively working in).
+  ipcMain.handle('notes:create', (_event, title: string, colour: string) =>
+    createNote(getDb(), currentAppDateString(), title, colour)
+  )
+  ipcMain.handle('notes:rename', (_event, noteId: number, title: string) =>
+    updateNoteTitle(getDb(), noteId, title)
+  )
+
   // Reopening a done task on a past (read-only) note, after the user
-  // confirms "move this task to today?". Moves the task onto today's note,
-  // reopens it, and logs a task.reopened line — same event type as
-  // reopening a task in place, since from the log's point of view the task
-  // just became open again (its new note is implied by today's date).
+  // confirms "move this task to today?". Finds (or creates) the post-it on
+  // today with the same title+colour as the task's original note — the
+  // same rule rollover itself uses — moves the task there, reopens it, and
+  // logs a task.reopened line.
   ipcMain.handle('tasks:moveToToday', (_event, taskId: number) => {
     const sourceTask = getTaskById(taskId)
-    const today = rolloverAndLog(currentAppDateString())
-    const moved = moveTaskToNote(taskId, today.id)
+    const sourceNote = sourceTask ? getNoteById(getDb(), sourceTask.noteId) : null
+    rolloverAndLog(currentAppDateString())
+    const targetNote = ensureTodayNoteFor(
+      sourceNote?.title ?? DEFAULT_NOTE_TITLE,
+      sourceNote?.colour ?? DEFAULT_NOTE_COLOUR
+    )
+    const moved = moveTaskToNote(taskId, targetNote.id)
     if (sourceTask) recalculatePerfectDay(getDb(), sourceTask.noteId)
-    recalculatePerfectDay(getDb(), today.id)
+    recalculatePerfectDay(getDb(), targetNote.id)
     appendTaskEvent(getVaultStatus(getDb()).path, {
       type: 'task.reopened',
       status: moved.status,
-      title: moved.title
+      title: moved.title,
+      noteTitle: targetNote.title
     })
     return moved
   })

@@ -1,49 +1,39 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
-import type { Note, Task, NewTask, TaskStatus, VaultStatus, DayResult } from '../shared/types'
+import type { Note, BoardNote, Task, NewTask, DayResult, VaultStatus } from '../shared/types'
 
-// Custom API for the renderer — today's note + task CRUD (Milestone 2),
-// extended with launch rollover (Milestone 4). Each function just forwards
-// to an ipcMain.handle in src/main/index.ts and returns its result; the
-// renderer never touches SQLite or Node directly.
-//
-// Dev detection here can't use @electron-toolkit/utils's `is.dev` — that
-// reads Electron's `app` module, which only exists in the main process.
-// Importing it from a preload script throws at load time (app is undefined
-// here), which silently crashes the whole preload script before
-// contextBridge ever runs — leaving window.api completely undefined in the
-// renderer. ELECTRON_RENDERER_URL is only set by electron-vite in `npm run
-// dev`, so it's a safe dev/packaged signal from inside preload.
-const isDev = Boolean(process.env['ELECTRON_RENDERER_URL'])
-
+// Custom APIs for renderer
 const api = {
-  getTodayNote: (): Promise<Note> => ipcRenderer.invoke('todayNote:get'),
+  // Task CRUD (Milestone 2/4/6/8b — see main/index.ts for what each call does).
   listTasks: (noteId: number): Promise<Task[]> => ipcRenderer.invoke('tasks:list', noteId),
   createTask: (noteId: number, input: NewTask): Promise<Task> =>
     ipcRenderer.invoke('tasks:create', noteId, input),
   updateTaskTitle: (taskId: number, title: string): Promise<Task> =>
     ipcRenderer.invoke('tasks:updateTitle', taskId, title),
-  setTaskStatus: (taskId: number, status: TaskStatus): Promise<Task> =>
+  setTaskStatus: (taskId: number, status: 'open' | 'done'): Promise<Task> =>
     ipcRenderer.invoke('tasks:setStatus', taskId, status),
   deleteTask: (taskId: number): Promise<void> => ipcRenderer.invoke('tasks:delete', taskId),
-  // Milestone 7 (revised): history board, one day at a time.
-  getDayForOffset: (dayOffset: number): Promise<DayResult> =>
-    ipcRenderer.invoke('notes:getForDay', dayOffset),
-  getNoteByDate: (noteDate: string): Promise<Note | null> =>
-    ipcRenderer.invoke('notes:getByDate', noteDate),
   moveTaskToToday: (taskId: number): Promise<Task> =>
     ipcRenderer.invoke('tasks:moveToToday', taskId),
+
+  // History board (Milestone 7, revised) + multiple post-its per day (Milestone 8b).
+  getDayForOffset: (dayOffset: number): Promise<DayResult> =>
+    ipcRenderer.invoke('notes:getForDay', dayOffset),
+  getNoteById: (noteId: number): Promise<Note | null> => ipcRenderer.invoke('notes:getById', noteId),
   setNotePosition: (noteId: number, x: number, y: number): Promise<void> =>
     ipcRenderer.invoke('notes:setPosition', noteId, x, y),
-  // Milestone 5: Settings + vault folder picker.
+  createNote: (title: string, colour: string): Promise<BoardNote> =>
+    ipcRenderer.invoke('notes:create', title, colour),
+  renameNote: (noteId: number, title: string): Promise<Note> =>
+    ipcRenderer.invoke('notes:rename', noteId, title),
+
+  // Settings / Obsidian vault folder (Milestone 5).
   getVaultStatus: (): Promise<VaultStatus> => ipcRenderer.invoke('vault:getStatus'),
-  chooseVaultFolder: (): Promise<VaultStatus | null> =>
-    ipcRenderer.invoke('vault:chooseFolder'),
-  // Dev-only: advances the app's simulated "today" by one day and re-runs
-  // rollover, so rollover can be tested without waiting for a real day to
-  // pass. Only exposed in `npm run dev` — never present in a packaged build.
-  ...(isDev
-    ? { simulateNextDay: (): Promise<Note> => ipcRenderer.invoke('dev:simulateNextDay') }
+  chooseVaultFolder: (): Promise<VaultStatus | null> => ipcRenderer.invoke('vault:chooseFolder'),
+
+  // Dev-only: only exists while running `npm run dev`, see main/index.ts.
+  ...(process.env['ELECTRON_RENDERER_URL']
+    ? { simulateNextDay: (): Promise<void> => ipcRenderer.invoke('dev:simulateNextDay') }
     : {})
 }
 

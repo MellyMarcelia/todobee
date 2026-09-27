@@ -2,12 +2,18 @@
 // which is about tasks within a note). Used by the history board — plain
 // functions over a plain better-sqlite3 Database, same pattern as the rest
 // of main/*Repo.ts, so they're testable without Electron.
+//
+// Milestone 8b: a calendar date can now have several notes (post-its), not
+// just one, so this file works in terms of "notes for a date" (plural)
+// rather than "the note for a date" (singular).
 import type Database from 'better-sqlite3'
-import type { Note } from '../shared/types'
+import type { BoardNote, Note } from '../shared/types'
 
 interface NoteRow {
   id: number
   note_date: string
+  title: string
+  colour: string
   sealed: number
   perfect_day: number
   board_x: number | null
@@ -15,10 +21,16 @@ interface NoteRow {
   created_at: string
 }
 
-function toNote(row: NoteRow): Note {
+interface NoteRowWithTaskCount extends NoteRow {
+  task_count: number
+}
+
+export function toNote(row: NoteRow): Note {
   return {
     id: row.id,
     noteDate: row.note_date,
+    title: row.title,
+    colour: row.colour,
     sealed: row.sealed === 1,
     perfectDay: row.perfect_day === 1,
     boardX: row.board_x,
@@ -27,12 +39,52 @@ function toNote(row: NoteRow): Note {
   }
 }
 
-/** The note for a specific calendar date, or null if none exists yet. */
-export function getNoteByDate(db: Database.Database, noteDate: string): Note | null {
-  const row = db
-    .prepare<[string], NoteRow>('SELECT * FROM notes WHERE note_date = ?')
-    .get(noteDate)
+function toBoardNote(row: NoteRowWithTaskCount): BoardNote {
+  return { ...toNote(row), taskCount: row.task_count }
+}
+
+/**
+ * Every post-it note that belongs to a given calendar date, oldest-created
+ * first, each with its task count — what the board needs to render its pins
+ * and "N tasks" labels in one query.
+ */
+export function listNotesForDate(db: Database.Database, noteDate: string): BoardNote[] {
+  const rows = db
+    .prepare<[string], NoteRowWithTaskCount>(
+      `SELECT notes.*, COUNT(tasks.id) AS task_count
+       FROM notes
+       LEFT JOIN tasks ON tasks.note_id = notes.id
+       WHERE notes.note_date = ?
+       GROUP BY notes.id
+       ORDER BY notes.created_at ASC, notes.id ASC`
+    )
+    .all(noteDate)
+  return rows.map(toBoardNote)
+}
+
+/** A single note by id, or null if it doesn't exist. */
+export function getNoteById(db: Database.Database, noteId: number): Note | null {
+  const row = db.prepare<[number], NoteRow>('SELECT * FROM notes WHERE id = ?').get(noteId)
   return row ? toNote(row) : null
+}
+
+/** Creates a new, unsealed post-it on the given date with the chosen title/colour. */
+export function createNote(
+  db: Database.Database,
+  noteDate: string,
+  title: string,
+  colour: string
+): Note {
+  const result = db
+    .prepare('INSERT INTO notes (note_date, title, colour) VALUES (?, ?, ?)')
+    .run(noteDate, title, colour)
+  return getNoteById(db, result.lastInsertRowid as number)!
+}
+
+/** Renames a post-it — clicking its title on the board/note screen. */
+export function updateNoteTitle(db: Database.Database, noteId: number, title: string): Note {
+  db.prepare('UPDATE notes SET title = ? WHERE id = ?').run(title, noteId)
+  return getNoteById(db, noteId)!
 }
 
 /**

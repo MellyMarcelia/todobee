@@ -5,13 +5,12 @@ import Bee from '../components/Bee.vue'
 import goodJobStamp from '../assets/stamps/good-job-stamp.png'
 import type { Note, Task } from '../../../shared/types'
 
-// When noteDate is omitted, this screen shows/edits *today's* note (runs
-// rollover on load, same as Milestone 2/4). When noteDate is given, it shows
-// a specific past note by date — used by the history board (Milestone 7).
-// Read-only-ness is decided from the loaded note's own `sealed` flag rather
-// than just "was a date passed in", since that's the actual source of truth
-// (today's note is always unsealed, every past note is always sealed).
-const props = defineProps<{ noteDate?: string }>()
+// Milestone 8b: this screen always shows one specific post-it, opened by id
+// (there's no more "the note for today" ambiguity now that a day can have
+// several post-its). Read-only-ness is decided from the loaded note's own
+// `sealed` flag (today's post-its are always unsealed, every past post-it
+// is always sealed).
+const props = defineProps<{ noteId: number }>()
 const emit = defineEmits<{ back: [] }>()
 
 const note = ref<Note | null>(null)
@@ -38,11 +37,9 @@ async function loadNote(): Promise<void> {
   loadError.value = null
   hasLoadedOnce = false
   try {
-    const loaded = props.noteDate
-      ? await window.api.getNoteByDate(props.noteDate)
-      : await window.api.getTodayNote()
+    const loaded = await window.api.getNoteById(props.noteId)
     if (!loaded) {
-      loadError.value = `No note found for ${props.noteDate}.`
+      loadError.value = `No post-it found (id ${props.noteId}).`
       return
     }
     note.value = loaded
@@ -66,8 +63,12 @@ onMounted(loadNote)
 // Dev-only "simulate next day" (Milestone 4). window.api.simulateNextDay is
 // only defined when running `npm run dev` (see preload/index.ts), so this
 // button and its handler simply don't exist in a packaged build. Only shown
-// on today's own (editable) note — simulating from a past note's screen
+// on an editable (today's) post-it — simulating from a past note's screen
 // would be confusing since it changes the whole app's notion of "today".
+// Milestone 8b: advancing the day can change which post-its exist (today's
+// post-its may get sealed, new ones created), so instead of trying to
+// guess which post-it to show next, just head back to the board and let it
+// reload the new day.
 const isDev = import.meta.env.DEV
 const isSimulatingNextDay = ref(false)
 
@@ -76,9 +77,8 @@ async function simulateNextDay(): Promise<void> {
   isSimulatingNextDay.value = true
   loadError.value = null
   try {
-    const newToday = await window.api.simulateNextDay()
-    note.value = newToday
-    tasks.value = await window.api.listTasks(newToday.id)
+    await window.api.simulateNextDay()
+    emit('back')
   } catch (error) {
     loadError.value = error instanceof Error ? error.message : String(error)
     console.error('Failed to simulate next day:', error)
@@ -113,9 +113,9 @@ async function toggleTaskStatus(task: Task): Promise<void> {
 }
 
 // A read-only past note only allows one interaction: reopening a *done*
-// task, which asks for confirmation before moving it to today's note.
-// Everything else on a read-only note (adding, editing text, deleting,
-// re-completing an already-open task) is disabled.
+// task, which asks for confirmation before moving it to today's matching
+// post-it. Everything else on a read-only note (adding, editing text,
+// deleting, re-completing an already-open task) is disabled.
 const taskPendingMove = ref<Task | null>(null)
 
 function onCheckboxClick(task: Task): void {
@@ -174,13 +174,27 @@ function doneForNow(): void {
   setTimeout(() => emit('back'), 320)
 }
 
-const noteTitle = computed(() => {
-  if (!isReadOnly.value) return "today's buzz"
-  if (!note.value) return ''
-  const [, month, day] = note.value.noteDate.split('-').map(Number)
-  const monthName = new Date(2000, month - 1, 1).toLocaleString('en-US', { month: 'short' })
-  return `${monthName} ${day}`
-})
+// Milestone 8b: the post-it's title is renamable by clicking it, same
+// click-to-edit pattern as a task's title. Only on an editable (unsealed)
+// post-it — history is read-only.
+const isEditingTitle = ref(false)
+const editingNoteTitle = ref('')
+
+function startEditingTitle(): void {
+  if (isReadOnly.value || !note.value) return
+  isEditingTitle.value = true
+  editingNoteTitle.value = note.value.title
+}
+
+async function confirmEditTitle(): Promise<void> {
+  if (!isEditingTitle.value || !note.value) return
+  isEditingTitle.value = false
+
+  const title = editingNoteTitle.value.trim()
+  if (!title || title === note.value.title) return
+
+  note.value = await window.api.renameNote(note.value.id, title)
+}
 
 // Milestone 8: "perfect day" stamp + bee celebration. isPerfectDay is
 // computed the exact same way the main process derives perfect_day (has at
@@ -229,8 +243,24 @@ watch(isPerfectDay, (nowPerfect, wasPerfect) => {
       <button class="load-error-retry" @click="loadNote">Retry</button>
     </div>
 
-    <div v-else-if="note" class="note" :class="{ 'note-flying-back': isFlyingBack }">
-      <h1 class="note-title">{{ noteTitle }}</h1>
+    <div
+      v-else-if="note"
+      class="note"
+      :class="{ 'note-flying-back': isFlyingBack }"
+      :style="{ background: note.colour, borderColor: 'var(--color-note-border)' }"
+    >
+      <input
+        v-if="isEditingTitle"
+        v-model="editingNoteTitle"
+        v-focus
+        class="note-title-input"
+        type="text"
+        @keyup.enter="confirmEditTitle"
+        @blur="confirmEditTitle"
+      />
+      <h1 v-else class="note-title" :class="{ readonly: isReadOnly }" @click="startEditingTitle">
+        {{ note.title }}
+      </h1>
       <p v-if="isReadOnly" class="note-readonly-badge">read-only history</p>
       <p v-if="isDev" class="note-date-debug">{{ note.noteDate }}</p>
 
@@ -413,7 +443,6 @@ watch(isPerfectDay, (nowPerfect, wasPerfect) => {
   width: 100%;
   max-width: 340px;
   min-height: 420px;
-  background: var(--color-note);
   border: var(--outline-width-thick) solid var(--color-note-border);
   border-radius: var(--radius-note);
   padding: 28px 24px 60px;
@@ -431,6 +460,23 @@ watch(isPerfectDay, (nowPerfect, wasPerfect) => {
 .note-title {
   text-align: center;
   font-size: 1.5rem;
+  cursor: text;
+}
+
+.note-title.readonly {
+  cursor: default;
+}
+
+.note-title-input {
+  font: inherit;
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  text-align: center;
+  color: var(--color-text);
+  background: #fff8ea;
+  border: var(--outline-width) solid var(--color-ink);
+  border-radius: 8px;
+  padding: 2px 8px;
 }
 
 .note-readonly-badge {
@@ -584,6 +630,7 @@ watch(isPerfectDay, (nowPerfect, wasPerfect) => {
   align-items: center;
   justify-content: center;
   padding: 24px;
+  z-index: 20;
 }
 
 .move-confirm-card {
@@ -631,8 +678,8 @@ watch(isPerfectDay, (nowPerfect, wasPerfect) => {
 
 /* Milestone 8: "Good job" stamp. Pressed across almost the whole note,
    tilted like a rubber stamp that's been pressed slightly off-angle. It's an
-   overlay (absolutely positioned, no pointer events) so the tasks underneath
-   stay readable and clickable through the transparent PNG. */
+   overlay drawn solidly on top of the tasks, with no pointer events so the
+   tasks underneath stay clickable through it. */
 .good-job-stamp {
   position: absolute;
   top: 50%;
@@ -641,10 +688,8 @@ watch(isPerfectDay, (nowPerfect, wasPerfect) => {
   max-height: 70%;
   object-fit: contain;
   transform: translate(-50%, -50%) rotate(-8deg);
-  opacity: 0.85;
-  mix-blend-mode: multiply;
   pointer-events: none;
-  z-index: 1;
+  z-index: 10;
 }
 
 /* Bee celebration overlay — floats above the note, centered, so the bounce
@@ -655,5 +700,6 @@ watch(isPerfectDay, (nowPerfect, wasPerfect) => {
   left: 50%;
   transform: translateX(-50%);
   pointer-events: none;
+  z-index: 30;
 }
 </style>
