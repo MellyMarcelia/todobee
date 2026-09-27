@@ -13,6 +13,7 @@ interface TodobeeApi {
   setNotePosition: (noteId: number, x: number, y: number) => Promise<void>
   createNote: (title: string, colour: string) => Promise<BoardNote>
   renameNote: (noteId: number, title: string) => Promise<Note>
+  deleteNote: (noteId: number) => Promise<void>
   getVaultStatus: () => Promise<VaultStatus>
   chooseVaultFolder: () => Promise<VaultStatus | null>
   /** Dev-only — only present when running `npm run dev`, absent in packaged builds. */

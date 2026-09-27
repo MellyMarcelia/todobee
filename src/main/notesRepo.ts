@@ -95,3 +95,34 @@ export function updateNoteTitle(db: Database.Database, noteId: number, title: st
 export function setNotePosition(db: Database.Database, noteId: number, x: number, y: number): void {
   db.prepare('UPDATE notes SET board_x = ?, board_y = ? WHERE id = ?').run(x, y, noteId)
 }
+
+interface DeletedTaskRow {
+  title: string
+  status: string
+}
+
+/**
+ * Deletes a post-it and every task on it, in one transaction so a failure
+ * can't leave orphaned tasks behind. Returns the tasks that were removed
+ * (title + status) so the caller can log one task.deleted line per task —
+ * deleting a whole post-it must never silently drop tasks from the log.
+ */
+export function deleteNote(
+  db: Database.Database,
+  noteId: number
+): { title: string; status: 'open' | 'done' }[] {
+  const remove = db.transaction(() => {
+    const tasks = db
+      .prepare<[number], DeletedTaskRow>(
+        'SELECT title, status FROM tasks WHERE note_id = ? ORDER BY created_at ASC, id ASC'
+      )
+      .all(noteId)
+    db.prepare('DELETE FROM tasks WHERE note_id = ?').run(noteId)
+    db.prepare('DELETE FROM notes WHERE id = ?').run(noteId)
+    return tasks
+  })
+  return remove().map((task) => ({
+    title: task.title,
+    status: task.status === 'done' ? ('done' as const) : ('open' as const)
+  }))
+}

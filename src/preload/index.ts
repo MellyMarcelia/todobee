@@ -26,6 +26,7 @@ const api = {
     ipcRenderer.invoke('notes:create', title, colour),
   renameNote: (noteId: number, title: string): Promise<Note> =>
     ipcRenderer.invoke('notes:rename', noteId, title),
+  deleteNote: (noteId: number): Promise<void> => ipcRenderer.invoke('notes:delete', noteId),
 
   // Settings / Obsidian vault folder (Milestone 5).
   getVaultStatus: (): Promise<VaultStatus> => ipcRenderer.invoke('vault:getStatus'),

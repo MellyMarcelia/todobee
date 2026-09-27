@@ -6,7 +6,8 @@ import {
   getNoteById,
   createNote,
   updateNoteTitle,
-  setNotePosition
+  setNotePosition,
+  deleteNote
 } from '../notesRepo'
 
 function makeDb(): Database.Database {
@@ -163,5 +164,50 @@ describe('setNotePosition', () => {
     const note = getNoteById(db, noteId)
     expect(note?.boardX).toBeNull()
     expect(note?.boardY).toBeNull()
+  })
+})
+
+describe('deleteNote', () => {
+  let db: Database.Database
+
+  beforeEach(() => {
+    db = makeDb()
+  })
+
+  it('removes the note and all of its tasks', () => {
+    const noteId = insertNote(db, '2026-09-28', 'School', '#4A90D9')
+    insertTask(db, noteId, 'open')
+    insertTask(db, noteId, 'done')
+
+    deleteNote(db, noteId)
+
+    expect(getNoteById(db, noteId)).toBeNull()
+    const remaining = db.prepare('SELECT COUNT(*) AS n FROM tasks WHERE note_id = ?').get(noteId) as {
+      n: number
+    }
+    expect(remaining.n).toBe(0)
+  })
+
+  it('returns the deleted tasks so they can be logged', () => {
+    const noteId = insertNote(db, '2026-09-28')
+    insertTask(db, noteId, 'open')
+    insertTask(db, noteId, 'done')
+
+    expect(deleteNote(db, noteId)).toEqual([
+      { title: 'a task', status: 'open' },
+      { title: 'a task', status: 'done' }
+    ])
+  })
+
+  it('leaves other notes on the same date untouched', () => {
+    const keptId = insertNote(db, '2026-09-28', 'Personal', '#7FB069')
+    insertTask(db, keptId)
+    const deletedId = insertNote(db, '2026-09-28', 'School', '#4A90D9')
+
+    deleteNote(db, deletedId)
+
+    const notes = listNotesForDate(db, '2026-09-28')
+    expect(notes.map((note) => note.id)).toEqual([keptId])
+    expect(notes[0].taskCount).toBe(1)
   })
 })
