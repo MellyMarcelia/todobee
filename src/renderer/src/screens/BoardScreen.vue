@@ -34,7 +34,7 @@ onMounted(loadVaultStatus)
   <div class="board-screen">
     <section class="board">
       <div class="board-header">
-        <h2 class="board-title">your hive board :)</h2>
+        <h2 class="board-title">to-do</h2>
         <button
           class="settings-button"
           aria-label="Settings"
@@ -106,6 +106,7 @@ onMounted(loadVaultStatus)
   align-items: center;
   justify-content: center;
   position: relative;
+  margin-bottom: 10px;
 }
 
 .settings-button {
