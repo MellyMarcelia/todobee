@@ -1,10 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
+import { is } from '@electron-toolkit/utils'
 import type { Note, Task, NewTask, TaskStatus } from '../shared/types'
 
-// Custom API for the renderer — today's note + task CRUD (Milestone 2).
-// Each function just forwards to an ipcMain.handle in src/main/index.ts and
-// returns its result; the renderer never touches SQLite or Node directly.
+// Custom API for the renderer — today's note + task CRUD (Milestone 2),
+// extended with launch rollover (Milestone 4). Each function just forwards
+// to an ipcMain.handle in src/main/index.ts and returns its result; the
+// renderer never touches SQLite or Node directly.
 const api = {
   getTodayNote: (): Promise<Note> => ipcRenderer.invoke('todayNote:get'),
   listTasks: (noteId: number): Promise<Task[]> => ipcRenderer.invoke('tasks:list', noteId),
@@ -14,7 +16,13 @@ const api = {
     ipcRenderer.invoke('tasks:updateTitle', taskId, title),
   setTaskStatus: (taskId: number, status: TaskStatus): Promise<Task> =>
     ipcRenderer.invoke('tasks:setStatus', taskId, status),
-  deleteTask: (taskId: number): Promise<void> => ipcRenderer.invoke('tasks:delete', taskId)
+  deleteTask: (taskId: number): Promise<void> => ipcRenderer.invoke('tasks:delete', taskId),
+  // Dev-only: advances the app's simulated "today" by one day and re-runs
+  // rollover, so rollover can be tested without waiting for a real day to
+  // pass. Only exposed in `npm run dev` — never present in a packaged build.
+  ...(is.dev
+    ? { simulateNextDay: (): Promise<Note> => ipcRenderer.invoke('dev:simulateNextDay') }
+    : {})
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

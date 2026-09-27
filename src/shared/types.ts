@@ -8,6 +8,8 @@ export interface Note {
   id: number
   /** ISO calendar date, e.g. "2026-09-27". */
   noteDate: string
+  /** True once this note is no longer today's note — its unfinished tasks have rolled over and it's read-only history. */
+  sealed: boolean
   /** True once every task on this note was completed at least once (the "perfect day" badge). */
   perfectDay: boolean
   createdAt: string

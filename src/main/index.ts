@@ -2,8 +2,9 @@ import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import { getDb } from './db'
+import { runLaunchRollover } from './rollover'
 import {
-  getOrCreateTodayNote,
   listTasksForNote,
   createTask,
   updateTaskTitle,
@@ -18,6 +19,21 @@ function todayDateString(): string {
   const year = now.getFullYear()
   const month = String(now.getMonth() + 1).padStart(2, '0')
   const day = String(now.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+// Dev-only "simulate next day" helper (Milestone 4). Lets you test rollover
+// without waiting for the system clock to roll over. Only exists while
+// `is.dev` is true — never present in a packaged build.
+let devDateOffsetDays = 0
+
+function currentAppDateString(): string {
+  if (devDateOffsetDays === 0) return todayDateString()
+  const shifted = new Date()
+  shifted.setDate(shifted.getDate() + devDateOffsetDays)
+  const year = shifted.getFullYear()
+  const month = String(shifted.getMonth() + 1).padStart(2, '0')
+  const day = String(shifted.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
 }
 
@@ -73,9 +89,10 @@ app.whenReady().then(() => {
 
   ipcMain.on('ping', () => console.log('pong')) // demo IPC handshake — remove once real IPC channels exist
 
-  // Today's note + task CRUD (Milestone 2). Each handler is a thin wrapper
-  // around tasksRepo — the actual SQL lives there, this just wires it to IPC.
-  ipcMain.handle('todayNote:get', () => getOrCreateTodayNote(todayDateString()))
+  // Today's note + task CRUD (Milestone 2, extended with rollover in
+  // Milestone 4). Each handler is a thin wrapper around tasksRepo/rollover —
+  // the actual SQL lives there, this just wires it to IPC.
+  ipcMain.handle('todayNote:get', () => runLaunchRollover(getDb(), currentAppDateString()))
   ipcMain.handle('tasks:list', (_event, noteId: number) => listTasksForNote(noteId))
   ipcMain.handle('tasks:create', (_event, noteId: number, input: NewTask) =>
     createTask(noteId, input)
@@ -87,6 +104,16 @@ app.whenReady().then(() => {
     setTaskStatus(taskId, status)
   )
   ipcMain.handle('tasks:delete', (_event, taskId: number) => deleteTask(taskId))
+
+  // Dev-only: lets the renderer's "simulate next day" button advance the
+  // app's notion of "today" by one day and immediately re-run rollover, so
+  // rollover can be tested without waiting for the real clock to turn over.
+  if (is.dev) {
+    ipcMain.handle('dev:simulateNextDay', () => {
+      devDateOffsetDays += 1
+      return runLaunchRollover(getDb(), currentAppDateString())
+    })
+  }
 
   createWindow()
 

@@ -26,6 +26,18 @@ async function loadTodayNote(): Promise<void> {
 
 onMounted(loadTodayNote)
 
+// Dev-only "simulate next day" (Milestone 4). window.api.simulateNextDay is
+// only defined when running `npm run dev` (see preload/index.ts), so this
+// button and its handler simply don't exist in a packaged build.
+const isDev = import.meta.env.DEV
+
+async function simulateNextDay(): Promise<void> {
+  if (!window.api.simulateNextDay) return
+  const newToday = await window.api.simulateNextDay()
+  note.value = newToday
+  tasks.value = await window.api.listTasks(newToday.id)
+}
+
 function startAddingTask(): void {
   isAddingTask.value = true
   newTaskTitle.value = ''
@@ -136,6 +148,16 @@ async function removeTask(task: Task): Promise<void> {
 
       <!-- help button, bottom-left -->
       <button class="help-button" aria-label="Help">?</button>
+
+      <!-- dev-only: simulate next day, to test rollover without waiting -->
+      <button
+        v-if="isDev"
+        class="dev-next-day-button"
+        title="Dev only: simulate next day"
+        @click="simulateNextDay"
+      >
+        ⏭ next day
+      </button>
     </div>
   </div>
 </template>
@@ -299,6 +321,19 @@ async function removeTask(task: Task): Promise<void> {
   color: var(--color-text);
   font-family: var(--font-heading);
   font-weight: 800;
+  cursor: pointer;
+}
+
+.dev-next-day-button {
+  position: absolute;
+  top: -14px;
+  right: 8px;
+  font-size: 0.7rem;
+  padding: 4px 8px;
+  border-radius: 10px;
+  border: 1px dashed var(--color-ink);
+  background: #fff8ea;
+  color: var(--color-text-muted);
   cursor: pointer;
 }
 </style>

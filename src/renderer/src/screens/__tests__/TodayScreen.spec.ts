@@ -20,6 +20,7 @@ import type { Note, Task } from '../../../../shared/types'
 const fakeNote: Note = {
   id: 1,
   noteDate: '2026-09-27',
+  sealed: false,
   perfectDay: false,
   createdAt: '2026-09-27 00:00:00'
 }
