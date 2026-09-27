@@ -129,16 +129,6 @@ async function removeTask(task: Task): Promise<void> {
         </li>
       </ul>
 
-      <!-- folded corner / finish button -->
-      <button class="fold-corner" aria-label="Finish note">
-        <svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
-          <path d="M0 60 L60 60 L60 0 Z" class="fold-shape" />
-        </svg>
-        <span class="fold-check">
-          <CheckIcon />
-        </span>
-      </button>
-
       <!-- decorative honey dipper + pencil, bottom-right -->
       <svg viewBox="0 0 80 60" class="decoration" xmlns="http://www.w3.org/2000/svg">
         <line x1="10" y1="50" x2="24" y2="20" class="pencil-deco" />
@@ -299,42 +289,6 @@ async function removeTask(task: Task): Promise<void> {
 
 .add-row {
   opacity: 0.7;
-}
-
-.fold-corner {
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  width: 60px;
-  height: 60px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  padding: 0;
-  border-bottom-right-radius: var(--radius-note);
-  overflow: hidden;
-}
-
-.fold-corner svg {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.fold-shape {
-  fill: var(--color-note-border);
-  stroke: var(--color-ink);
-  stroke-width: 2;
-}
-
-.fold-check {
-  position: absolute;
-  bottom: 8px;
-  right: 8px;
-  width: 20px;
-  height: 20px;
-  color: #fff8ea;
 }
 
 .decoration {
