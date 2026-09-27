@@ -161,6 +161,25 @@ watch(day, () => {
 // post-it to a sealed, read-only past day). Picking a colour + typing a
 // title creates the note, then the day is reloaded so it shows up pinned.
 const NEW_NOTE_COLORS = ['#F6C56A', '#E76F51', '#4A90D9', '#E9A23B', '#7FB069']
+// The hexagon magnet pinning each post-it is always a different colour from
+// the post-it itself, so it stands out instead of blending in. Each post-it
+// colour gets a contrasting magnet colour; anything unexpected (e.g. an old
+// note with a colour no longer in the picker) falls back to red, or blue if
+// the note is already red.
+const PIN_COLOR_FOR_NOTE: Record<string, string> = {
+  '#F6C56A': '#E76F51',
+  '#E76F51': '#4A90D9',
+  '#4A90D9': '#E9A23B',
+  '#E9A23B': '#4A90D9',
+  '#7FB069': '#E76F51'
+}
+
+function pinColorFor(noteColour: string): string {
+  const pin = PIN_COLOR_FOR_NOTE[noteColour.toUpperCase()]
+  if (pin) return pin
+  return noteColour.toUpperCase() === '#E76F51' ? '#4A90D9' : '#E76F51'
+}
+
 const isAddingNote = ref(false)
 const newNoteTitle = ref('')
 const newNoteColour = ref(NEW_NOTE_COLORS[0])
@@ -173,6 +192,38 @@ function startAddingNote(): void {
 
 function cancelAddingNote(): void {
   isAddingNote.value = false
+}
+
+// Help (?) button next to the title: a small card explaining how the board
+// and post-its work. Purely informational — closing it changes nothing.
+const isHelpOpen = ref(false)
+
+// Deleting a whole post-it: the ✕ on one of today's pins asks for
+// confirmation first (it takes every task on the post-it with it), then
+// reloads the day. Past days are read-only, so their pins have no ✕.
+const notePendingDelete = ref<BoardNote | null>(null)
+const deleteError = ref<string | null>(null)
+
+function askDeleteNote(note: BoardNote): void {
+  notePendingDelete.value = note
+}
+
+function cancelDeleteNote(): void {
+  notePendingDelete.value = null
+}
+
+async function confirmDeleteNote(): Promise<void> {
+  const note = notePendingDelete.value
+  if (!note) return
+  notePendingDelete.value = null
+  deleteError.value = null
+  try {
+    await window.api.deleteNote(note.id)
+    await loadDay()
+  } catch (error) {
+    deleteError.value = error instanceof Error ? error.message : String(error)
+    console.error('Failed to delete note:', error)
+  }
 }
 
 async function confirmAddNote(): Promise<void> {
@@ -193,6 +244,7 @@ async function confirmAddNote(): Promise<void> {
   <div class="board-screen">
     <section class="board">
       <div class="board-header">
+        <button class="help-button" aria-label="Help" @click="isHelpOpen = true">?</button>
         <h2 class="board-title">to-do</h2>
         <button class="settings-button" aria-label="Settings" @click="$emit('open-settings')">
           <GearIcon />
@@ -219,65 +271,113 @@ async function confirmAddNote(): Promise<void> {
         Your vault folder can't be found, choose it again
       </p>
       <p v-if="loadError" class="warning-banner">Couldn't load this day: {{ loadError }}</p>
+      <p v-if="deleteError" class="warning-banner">Couldn't delete that post-it: {{ deleteError }}</p>
 
       <div ref="notesAreaRef" class="notes-area">
-        <button
+        <!-- Each pin is wrapped so the delete ✕ can sit beside the note's
+             own <button> (a button can't contain another button). -->
+        <div
           v-for="(note, index) in day?.notes ?? []"
           :key="note.id"
-          class="pinned-note"
-          :class="{ 'pinned-note-today': day?.isToday }"
+          class="pinned-note-wrap"
           :style="{
-            background: note.colour,
             left: `${positionFor(note, index).x}px`,
             top: `${positionFor(note, index).y}px`
           }"
-          @pointerdown="startDrag($event, note, index)"
-          @pointermove="onDragMove"
-          @pointerup="endDrag($event, note, index)"
         >
-          <span class="pin"><PinIcon :color="note.colour" /></span>
-          <span v-if="day?.isToday" class="today-label">today</span>
-          <img v-if="note.perfectDay" :src="goodJobStamp" alt="Good job" class="mini-stamp" />
-          <span class="pinned-note-title">{{ note.title }}</span>
-          <span class="pinned-note-task-count">{{ note.taskCount }} task{{ note.taskCount === 1 ? '' : 's' }}</span>
-        </button>
+          <button
+            class="pinned-note"
+            :class="{ 'pinned-note-today': day?.isToday, 'pinned-note-past': note.sealed }"
+            :style="{ background: note.sealed ? 'var(--color-note-past)' : note.colour }"
+            @pointerdown="startDrag($event, note, index)"
+            @pointermove="onDragMove"
+            @pointerup="endDrag($event, note, index)"
+          >
+            <span class="pin"><PinIcon :color="pinColorFor(note.colour)" /></span>
+            <span v-if="day?.isToday" class="today-label">today</span>
+            <img v-if="note.perfectDay" :src="goodJobStamp" alt="Good job" class="mini-stamp" />
+            <span class="pinned-note-title">{{ note.title }}</span>
+            <span class="pinned-note-task-count">{{ note.taskCount }} task{{ note.taskCount === 1 ? '' : 's' }}</span>
+          </button>
+          <button
+            v-if="day?.isToday && !note.sealed"
+            class="delete-note-button"
+            :aria-label="`Delete post-it ${note.title}`"
+            @click="askDeleteNote(note)"
+          >
+            ✕
+          </button>
+        </div>
 
         <p v-if="day && day.notes.length === 0" class="empty-day">Nothing here yet</p>
-
-        <!-- Milestone 8b: "+ new post-it" — only on today, since past days
-             are read-only history. -->
-        <button v-if="day?.isToday && !isAddingNote" class="add-note-button" @click="startAddingNote">
-          + new post-it
-        </button>
-
-        <div v-if="isAddingNote" class="add-note-form">
-          <input
-            v-model="newNoteTitle"
-            class="add-note-title-input"
-            type="text"
-            placeholder="e.g. School, Personal…"
-            @keyup.enter="confirmAddNote"
-          />
-          <div class="add-note-colors">
-            <button
-              v-for="colour in NEW_NOTE_COLORS"
-              :key="colour"
-              class="add-note-swatch"
-              :class="{ selected: newNoteColour === colour }"
-              :style="{ background: colour }"
-              :aria-label="`Choose colour ${colour}`"
-              @click="newNoteColour = colour"
-            />
-          </div>
-          <div class="add-note-buttons">
-            <button class="add-note-confirm" @click="confirmAddNote">Add</button>
-            <button class="add-note-cancel" @click="cancelAddingNote">Cancel</button>
-          </div>
-        </div>
       </div>
     </section>
 
+    <div v-if="isHelpOpen" class="delete-confirm-overlay" @click.self="isHelpOpen = false">
+      <div class="delete-confirm-card help-card">
+        <p class="delete-confirm-title">How Todobee works</p>
+        <ul class="help-list">
+          <li><strong>Open a post-it</strong> by clicking it; drag it to move it around.</li>
+          <li><strong>+ new post-it</strong> (under the board) adds another one for today.</li>
+          <li><strong>Hover a post-it</strong> and click ✕ to delete it with its tasks.</li>
+          <li>On a post-it: <strong>tap to add…</strong> a task, tick the box to finish it, click its text to edit it, hover and click ✕ to delete it.</li>
+          <li><strong>Click the title</strong> of a post-it to rename it.</li>
+          <li>Finish every task and the bee celebrates with a <strong>Well Done</strong> stamp.</li>
+          <li>Unfinished tasks <strong>move to the next day</strong> automatically; past days are gray and read-only.</li>
+          <li><strong>‹ ›</strong> browses earlier days; <strong>⚙</strong> picks your Obsidian vault.</li>
+        </ul>
+        <div class="delete-confirm-buttons">
+          <button class="delete-confirm-no" @click="isHelpOpen = false">Got it</button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="notePendingDelete" class="delete-confirm-overlay">
+      <div class="delete-confirm-card">
+        <p class="delete-confirm-title">Delete “{{ notePendingDelete.title }}”?</p>
+        <p v-if="notePendingDelete.taskCount > 0" class="delete-confirm-detail">
+          Its {{ notePendingDelete.taskCount }} task{{ notePendingDelete.taskCount === 1 ? '' : 's' }}
+          will be deleted too.
+        </p>
+        <div class="delete-confirm-buttons">
+          <button class="delete-confirm-yes" @click="confirmDeleteNote">Delete</button>
+          <button class="delete-confirm-no" @click="cancelDeleteNote">Cancel</button>
+        </div>
+      </div>
+    </div>
+
     <section class="desk">
+      <!-- Milestone 8b: "+ new post-it" — only on today, since past days
+           are read-only history. Sits just under the board, on the left. -->
+      <button v-if="day?.isToday && !isAddingNote" class="add-note-button" @click="startAddingNote">
+        + new post-it
+      </button>
+
+      <div v-if="isAddingNote && day?.isToday" class="add-note-form">
+        <input
+          v-model="newNoteTitle"
+          class="add-note-title-input"
+          type="text"
+          placeholder="e.g. School, Personal…"
+          @keyup.enter="confirmAddNote"
+        />
+        <div class="add-note-colors">
+          <button
+            v-for="colour in NEW_NOTE_COLORS"
+            :key="colour"
+            class="add-note-swatch"
+            :class="{ selected: newNoteColour === colour }"
+            :style="{ background: colour }"
+            :aria-label="`Choose colour ${colour}`"
+            @click="newNoteColour = colour"
+          />
+        </div>
+        <div class="add-note-buttons">
+          <button class="add-note-confirm" @click="confirmAddNote">Add</button>
+          <button class="add-note-cancel" @click="cancelAddingNote">Cancel</button>
+        </div>
+      </div>
+
       <!-- bee sitting at the desk, bottom-right.
            Laptop/stationery/desk removed for now — to be redesigned later. -->
       <div class="bee-at-desk">
@@ -289,6 +389,7 @@ async function confirmAddNote(): Promise<void> {
 
 <style scoped>
 .board-screen {
+  position: relative;
   height: 100%;
   width: 100%;
   display: flex;
@@ -329,6 +430,43 @@ async function confirmAddNote(): Promise<void> {
   color: #fff8ea;
   padding: 0;
   cursor: pointer;
+}
+
+.help-button {
+  position: absolute;
+  left: 0;
+  top: -2px;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid #fff8ea;
+  background: transparent;
+  color: #fff8ea;
+  font-family: var(--font-heading);
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.help-card {
+  max-width: 320px;
+  text-align: left;
+}
+
+.help-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--color-text);
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.help-card .delete-confirm-title {
+  text-align: center;
 }
 
 .day-nav {
@@ -389,8 +527,21 @@ async function confirmAddNote(): Promise<void> {
   text-align: center;
 }
 
-.pinned-note {
+.pinned-note-wrap {
   position: absolute;
+  width: 100px;
+  height: 100px;
+}
+
+/* Post-its can overlap once dragged around. Lift the one under the pointer
+   above its neighbours, so its ✕ is never hidden under another post-it. */
+.pinned-note-wrap:hover,
+.pinned-note-wrap:focus-within {
+  z-index: 5;
+}
+
+.pinned-note {
+  position: relative;
   width: 100px;
   height: 100px;
   border: var(--outline-width) solid var(--color-ink);
@@ -409,6 +560,18 @@ async function confirmAddNote(): Promise<void> {
 
 .pinned-note:active {
   cursor: grabbing;
+}
+
+/* Past post-its are grayed out (see --color-note-past); the pin fades with
+   them, but a "Good job" stamp keeps its colour so finished days still pop. */
+.pinned-note-past .pin {
+  filter: grayscale(1);
+  opacity: 0.6;
+}
+
+.pinned-note-past .pinned-note-title,
+.pinned-note-past .pinned-note-task-count {
+  color: var(--color-text-muted);
 }
 
 .pinned-note-today {
@@ -458,23 +621,109 @@ async function confirmAddNote(): Promise<void> {
   pointer-events: none;
 }
 
+.delete-note-button {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.pinned-note-wrap:hover .delete-note-button,
+.delete-note-button:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.delete-confirm-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(43, 38, 34, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 20;
+}
+
+.delete-confirm-card {
+  background: #fff8ea;
+  border: var(--outline-width-thick) solid var(--color-ink);
+  border-radius: 16px;
+  padding: 20px;
+  max-width: 280px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.delete-confirm-title {
+  color: var(--color-text);
+  font-family: var(--font-heading);
+  font-size: 0.95rem;
+}
+
+.delete-confirm-detail {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.delete-confirm-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 6px;
+}
+
+.delete-confirm-yes,
+.delete-confirm-no {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: var(--outline-width) solid var(--color-ink);
+  cursor: pointer;
+  font-family: var(--font-heading);
+}
+
+.delete-confirm-yes {
+  background: #e76f51;
+  color: #fff8ea;
+}
+
+.delete-confirm-no {
+  background: transparent;
+  color: var(--color-text);
+}
+
 .add-note-button {
   position: absolute;
-  bottom: 8px;
-  left: 8px;
+  top: 12px;
+  left: 20px;
   font-size: 0.75rem;
+  font-family: var(--font-heading);
   padding: 8px 12px;
   border-radius: 10px;
-  border: 1px dashed rgba(255, 248, 234, 0.7);
+  border: var(--outline-width) dashed var(--color-ink);
   background: transparent;
-  color: #fff8ea;
+  color: var(--color-text);
   cursor: pointer;
 }
 
 .add-note-form {
   position: absolute;
-  bottom: 8px;
-  left: 8px;
+  top: 12px;
+  left: 20px;
+  z-index: 5;
   display: flex;
   flex-direction: column;
   gap: 8px;
