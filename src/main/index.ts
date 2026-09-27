@@ -2,6 +2,24 @@ import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import {
+  getOrCreateTodayNote,
+  listTasksForNote,
+  createTask,
+  updateTaskTitle,
+  setTaskStatus,
+  deleteTask
+} from './tasksRepo'
+import type { NewTask } from '../shared/types'
+
+/** Today's date as "YYYY-MM-DD" in the user's local timezone. */
+function todayDateString(): string {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
 
 function createWindow(): void {
   // Create the browser window.
@@ -54,6 +72,21 @@ app.whenReady().then(() => {
   })
 
   ipcMain.on('ping', () => console.log('pong')) // demo IPC handshake — remove once real IPC channels exist
+
+  // Today's note + task CRUD (Milestone 2). Each handler is a thin wrapper
+  // around tasksRepo — the actual SQL lives there, this just wires it to IPC.
+  ipcMain.handle('todayNote:get', () => getOrCreateTodayNote(todayDateString()))
+  ipcMain.handle('tasks:list', (_event, noteId: number) => listTasksForNote(noteId))
+  ipcMain.handle('tasks:create', (_event, noteId: number, input: NewTask) =>
+    createTask(noteId, input)
+  )
+  ipcMain.handle('tasks:updateTitle', (_event, taskId: number, title: string) =>
+    updateTaskTitle(taskId, title)
+  )
+  ipcMain.handle('tasks:setStatus', (_event, taskId: number, status: 'open' | 'done') =>
+    setTaskStatus(taskId, status)
+  )
+  ipcMain.handle('tasks:delete', (_event, taskId: number) => deleteTask(taskId))
 
   createWindow()
 

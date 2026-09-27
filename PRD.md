@@ -40,9 +40,13 @@ Both are independent Electron apps, each with its own local SQLite database, sha
 - No points, currency, streak counter, or gamified economy — just the animation (transient) and the stamp/badge (persistent, computed from "were all tasks on this note completed").
 
 ### 3.3 History view
-- Finished daily notes are displayed as a **wall board / corkboard**: past notes appear pinned to the board like sticky notes, browsable chronologically (oldest to newest), each showing its stamp if it earned one.
+- The corkboard is the **home screen**: launching Todobee opens directly onto the board, not onto today's note.
+- **Today's note is pinned biggest and first**, labeled "today"; past notes are pinned smaller, ordered **newest-first** after it.
+- The board shows **one week at a time** (today plus up to 6 previous days, max 7 pinned notes), with `‹ week 39 ›`-style arrows at the top to page to earlier/later weeks.
+- Each pinned note shows a **tiny "Good job" stamp** on its board thumbnail if that day earned a "perfect day" badge.
 - The bee mascot sits at a small desk below the board (a static, cozy decorative touch — not interactive), reinforcing the "working bees" theme without adding functional complexity.
-- This board *is* the history feature described in §3.1 — not a separate screen from "today's note" navigation, just the visual presentation of past notes once they're finished.
+- Clicking **today's** pinned note opens it full-screen as the editable "today's buzz" note (§3.1). Clicking a **past** note opens it full-screen **read-only** — its tasks can be viewed and a done task can be reopened (which moves it to today, see below), but nothing on a past note can otherwise be added, edited, or deleted in place.
+- This board *is* the history feature described in §3.1 — not a separate screen from "today's note" navigation, just the visual presentation of all notes, current and past.
 
 ### 3.4 Obsidian logging
 - Logs to: `<vault>/Todobee/Tasks/YYYY/YYYY-MM/YYYY-MM-DD.md`
@@ -63,6 +67,17 @@ Both are independent Electron apps, each with its own local SQLite database, sha
 - [ ] Reopening any task on a note that previously earned a "perfect day" badge removes that badge/stamp (the day is no longer "all done").
 - [ ] Browsing the history board shows past finished notes pinned chronologically (oldest to newest), each showing its tasks and, where applicable, its "Good job" stamp, with the bee mascot visible at its desk below the board.
 - [ ] All task data (including rollover state and badges) survives a full app restart.
+- [ ] Launching the app opens directly onto the board (home screen), not onto today's note.
+- [ ] On the board, today's note is pinned larger than past notes, appears first, and is labeled "today"; past notes are pinned smaller and ordered newest-first after it.
+- [ ] The board shows at most 7 pinned notes at a time (today plus up to 6 previous days) and provides `‹ week N ›`-style arrows to page to earlier/later weeks; paging never creates, duplicates, or loses note data.
+- [ ] Each pinned note on the board shows a tiny stamp graphic if and only if that day earned a "perfect day" badge.
+- [ ] Clicking today's pinned note opens it full-screen as the editable "today's buzz" note.
+- [ ] Clicking a past (non-today) pinned note opens it full-screen, read-only: its tasks are visible but cannot be added, edited, or deleted from that view — only a done task's reopen action is available.
+- [ ] On today's note, adding a task via the "tap to add…" row, ticking a task's checkbox, clicking a task to edit it, and revealing a small ✕ to delete a task on hover all work as described and match the existing create/edit/complete/delete acceptance criteria above.
+- [ ] Ticking the last remaining open task on today's note shows both the "Good job" stamp and switches the bee to its happy pose (celebration), matching the existing "perfect day" acceptance criterion above.
+- [ ] Clicking the folded-corner ✓ on today's note ("done for now") animates the note back onto the board and pins it there; it does **not** mark the note as finished, does not delete anything, and any tasks left unfinished on it still roll over normally on the next day's launch (per the rollover acceptance criteria above).
+- [ ] On a read-only past note, reopening a done task shows a confirmation ("Move this task to today?") before acting; confirming moves the task to today's note (per the existing reopen-from-history acceptance criterion), and declining leaves the past note unchanged.
+- [ ] A Settings (⚙️) button and a Help (?) button are both present and reachable from the board; the Settings button opens the vault folder picker (§7).
 
 ## 4. Beemodoro (Pomodoro app)
 
@@ -154,13 +169,15 @@ The bee's animation/pose changes with session state:
 ## 6. Main user flows
 
 ### 6.1 Todobee
-1. **Launch app.** App checks today's date against the last note's date; if a new day, creates today's note and rolls forward any unfinished tasks from the previous note.
-2. **Add a task.** Type into today's note, press Enter — task appears immediately, persisted to SQLite, logged as `task.created`.
-3. **Work through the day.** Complete tasks as they're done (`task.completed`), edit details as needed (`task.edited`), delete anything no longer relevant (`task.deleted`).
-4. **All done.** Completing the last open task on today's note triggers the bee's celebration animation and marks the note with a "perfect day" badge.
-5. **Next day.** On next launch, any tasks left unfinished roll onto the new day's note; the previous note is sealed as history.
-6. **Review history.** Browse past notes chronologically, including their perfect-day badges.
-7. **Reopen from history.** Reopening a task on an old, finished note pulls it onto today's note instead of resurrecting the old one.
+1. **Launch app.** App checks today's date against the last note's date; if a new day, creates today's note and rolls forward any unfinished tasks from the previous note. The app opens directly on the **board** (home screen): today's note pinned biggest and first, labeled "today", with past notes pinned smaller, newest-first, up to 6 of them (one week at a time, paged with `‹ week N ›` arrows); the bee sits at the desk below.
+2. **Open today's note.** Clicking today's pinned note opens it full-screen as "today's buzz": add tasks via a "tap to add…" row, tick a task's checkbox to complete it, click a task to edit it, or reveal a small ✕ on hover to delete it.
+3. **All done.** Ticking the last open task on today's note shows the "Good job" stamp and switches the bee to its happy pose (celebration).
+4. **Done for now.** Clicking the folded-corner ✓ on today's note flies the note back onto the board and pins it there — this is a "put it away for now" action, not a finish/complete action: it doesn't delete or seal anything, and any tasks still unfinished on it roll over normally on the next day's launch.
+5. **Next day.** On next launch, any tasks left unfinished roll onto the new day's note; the previous note takes its place on the board as a smaller, newest-first pinned note (still today's — now "yesterday's" — note, showing its stamp if it earned one).
+6. **Review history.** Browse the board's pinned notes, paging by week with the arrows; each stamped day shows a tiny "Good job" stamp on its pin.
+7. **Open a past note.** Clicking a past (non-today) pinned note opens it full-screen, read-only — its tasks are visible but nothing can be added/edited/deleted directly on it.
+8. **Reopen from history.** On a read-only past note, reopening a done task prompts "Move this task to today?"; confirming pulls it onto today's note instead of resurrecting the old one, and declining leaves the past note untouched.
+9. **Settings and help.** A small ⚙️ Settings button (vault folder picker, §7) and a ? Help button are reachable from the board at all times.
 
 ### 6.2 Beemodoro
 1. **Launch app.** Bee sits idle in the center; snack tray is visible on the right.
@@ -206,7 +223,7 @@ Alternative considered but not chosen: **PGlite** (Postgres-in-WASM) — appeali
 - The log is a write-only export layer in both apps — neither app ever reads its own or the other app's log back; each app's SQLite database remains its sole authoritative source.
 
 **Screen layout:**
-- Todobee: a single sticky-note canvas showing today's note front-and-center, with simple navigation (e.g. back/forward arrows or a small history list) to browse past finished notes; the history view itself renders as a wall board with pinned past notes and a static bee-at-a-desk illustration underneath.
+- Todobee: the **board is the home screen**. It shows one week of pinned notes at a time — today's note pinned biggest and first (labeled "today"), then up to 6 past notes pinned smaller, newest-first — with `‹ week N ›` arrows at the top to page between weeks, and the static bee-at-a-desk illustration underneath. Clicking today's pin opens the editable "today's buzz" full-screen note (task list with a "tap to add…" row, checkboxes, click-to-edit, hover-to-reveal ✕ delete, and a folded-corner ✓ that returns the note to the board without finishing/sealing it). Clicking a past pin opens the same full-screen note layout **read-only**, with only a reopen-to-today action available on its done tasks (confirmed via a "Move this task to today?" prompt). A small ⚙️ Settings button (vault folder picker) and a ? Help button are reachable from the board.
 - Beemodoro: the bee's area sits center-left and doubles as both the idle bee display and the running session's focus/timer view (progress bar, animation, countdown, controls) — no separate screen/route needed to switch between them; a snack tray is docked to the right for dragging; the honeycomb/list history and lifetime stats line are reachable via a dedicated view (e.g. a tab or panel below/beside the main timer screen).
 
 **Usability decisions:**

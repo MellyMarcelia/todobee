@@ -1,14 +1,71 @@
 <script setup lang="ts">
+import { ref, onMounted } from 'vue'
 import CheckIcon from '../components/icons/CheckIcon.vue'
+import type { Note, Task } from '../../../shared/types'
 
 defineEmits<{ back: [] }>()
 
-// Static placeholder tasks — Milestone 2 replaces this with real SQLite data.
-const placeholderTasks = [
-  { title: 'Write PRD acceptance criteria', done: false },
-  { title: 'Sketch bee mascot poses', done: true },
-  { title: 'Set up electron-vite skeleton', done: true }
-]
+// Real data from SQLite via the main process (Milestone 2). `note` is null
+// until it loads; the template guards on that so nothing renders too early.
+const note = ref<Note | null>(null)
+const tasks = ref<Task[]>([])
+
+const newTaskTitle = ref('')
+const isAddingTask = ref(false)
+
+// Which task is currently being edited inline, if any. Holding just the id
+// (not a boolean per task) keeps only one row editable at a time.
+const editingTaskId = ref<number | null>(null)
+const editingTitle = ref('')
+
+async function loadTodayNote(): Promise<void> {
+  const todayNote = await window.api.getTodayNote()
+  note.value = todayNote
+  tasks.value = await window.api.listTasks(todayNote.id)
+}
+
+onMounted(loadTodayNote)
+
+function startAddingTask(): void {
+  isAddingTask.value = true
+  newTaskTitle.value = ''
+}
+
+async function confirmAddTask(): Promise<void> {
+  const title = newTaskTitle.value.trim()
+  isAddingTask.value = false
+  if (!title || !note.value) return
+
+  const created = await window.api.createTask(note.value.id, { title })
+  tasks.value.push(created)
+}
+
+async function toggleTaskStatus(task: Task): Promise<void> {
+  const nextStatus = task.status === 'open' ? 'done' : 'open'
+  const updated = await window.api.setTaskStatus(task.id, nextStatus)
+  const index = tasks.value.findIndex((t) => t.id === task.id)
+  if (index !== -1) tasks.value[index] = updated
+}
+
+function startEditingTask(task: Task): void {
+  editingTaskId.value = task.id
+  editingTitle.value = task.title
+}
+
+async function confirmEditTask(task: Task): Promise<void> {
+  const title = editingTitle.value.trim()
+  editingTaskId.value = null
+  if (!title || title === task.title) return
+
+  const updated = await window.api.updateTaskTitle(task.id, title)
+  const index = tasks.value.findIndex((t) => t.id === task.id)
+  if (index !== -1) tasks.value[index] = updated
+}
+
+async function removeTask(task: Task): Promise<void> {
+  await window.api.deleteTask(task.id)
+  tasks.value = tasks.value.filter((t) => t.id !== task.id)
+}
 </script>
 
 <template>
@@ -19,19 +76,56 @@ const placeholderTasks = [
       </svg>
     </button>
 
-    <div class="note">
+    <div v-if="note" class="note">
       <h1 class="note-title">today's buzz</h1>
 
       <ul class="task-list">
-        <li v-for="(task, i) in placeholderTasks" :key="i" class="task-row">
-          <span class="checkbox" :class="{ done: task.done }">
-            <CheckIcon v-if="task.done" />
+        <li v-for="task in tasks" :key="task.id" class="task-row">
+          <button
+            class="checkbox"
+            :class="{ done: task.status === 'done' }"
+            :aria-label="task.status === 'done' ? 'Mark as open' : 'Mark as done'"
+            @click="toggleTaskStatus(task)"
+          >
+            <CheckIcon v-if="task.status === 'done'" />
+          </button>
+
+          <input
+            v-if="editingTaskId === task.id"
+            v-model="editingTitle"
+            class="task-text-input"
+            type="text"
+            autofocus
+            @keyup.enter="confirmEditTask(task)"
+            @blur="confirmEditTask(task)"
+          />
+          <span
+            v-else
+            class="task-text"
+            :class="{ done: task.status === 'done' }"
+            @click="startEditingTask(task)"
+          >
+            {{ task.title }}
           </span>
-          <span class="task-text" :class="{ done: task.done }">{{ task.title }}</span>
+
+          <button class="delete-button" aria-label="Delete task" @click="removeTask(task)">
+            ✕
+          </button>
         </li>
+
         <li class="task-row add-row">
           <span class="checkbox placeholder-checkbox" />
-          <span class="task-text muted">tap to add…</span>
+          <input
+            v-if="isAddingTask"
+            v-model="newTaskTitle"
+            class="task-text-input"
+            type="text"
+            autofocus
+            placeholder="type a task…"
+            @keyup.enter="confirmAddTask"
+            @blur="confirmAddTask"
+          />
+          <span v-else class="task-text muted" @click="startAddingTask">tap to add…</span>
         </li>
       </ul>
 
@@ -126,6 +220,12 @@ const placeholderTasks = [
   display: flex;
   align-items: center;
   gap: 12px;
+  position: relative;
+}
+
+.task-row:hover .delete-button {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .checkbox {
@@ -139,6 +239,7 @@ const placeholderTasks = [
   align-items: center;
   justify-content: center;
   padding: 4px;
+  cursor: pointer;
 }
 
 .checkbox.done {
@@ -149,11 +250,14 @@ const placeholderTasks = [
 .checkbox.placeholder-checkbox {
   border-style: dashed;
   opacity: 0.5;
+  cursor: default;
 }
 
 .task-text {
   font-size: 1.05rem;
   color: var(--color-text);
+  flex: 1;
+  cursor: text;
 }
 
 .task-text.done {
@@ -164,6 +268,33 @@ const placeholderTasks = [
 .task-text.muted {
   color: var(--color-text-muted);
   font-weight: 400;
+}
+
+.task-text-input {
+  flex: 1;
+  font: inherit;
+  font-size: 1.05rem;
+  color: var(--color-text);
+  background: #fff8ea;
+  border: var(--outline-width) solid var(--color-ink);
+  border-radius: 6px;
+  padding: 2px 6px;
+}
+
+.delete-button {
+  position: absolute;
+  right: 0;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  font-size: 0.9rem;
+  line-height: 1;
 }
 
 .add-row {
