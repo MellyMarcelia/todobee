@@ -9,6 +9,7 @@
   /* Sticky note */
   --color-note: #f6c56a;
   --color-note-border: #b7862f;
+  --color-note-past: #d9d4cb; /* past (read-only) post-its are grayed out */
   --radius-board: 18px;
   --radius-note: 20px;
 
