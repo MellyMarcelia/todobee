@@ -4,7 +4,7 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { getDb } from './db'
 import { runLaunchRollover } from './rollover'
-import { getVaultStatus, setVaultPath, getDevDateOffset, setDevDateOffset } from './settingsRepo'
+import { getVaultStatus, setVaultPath } from './settingsRepo'
 import { appendTaskEvent } from './obsidianLogger'
 import type { TaskEvent } from './obsidianLogger'
 import {
@@ -38,37 +38,9 @@ function todayDateString(): string {
   return `${year}-${month}-${day}`
 }
 
-// Dev-only "simulate next day" helper (Milestone 4). Lets you test rollover
-// without waiting for the system clock to roll over. Only used while
-// `is.dev` is true — never present in a packaged build. The offset is saved
-// in the settings table so it survives restarts: when it lived only in
-// memory, restarting jumped the app back to the real date and stranded any
-// tasks already moved onto the simulated days.
-let devDateOffsetDays = 0
-
-/** "Now" as the app sees it: the real clock, shifted by the dev offset (always 0 in production). */
-function currentAppDate(): Date {
-  const shifted = new Date()
-  shifted.setDate(shifted.getDate() + devDateOffsetDays)
-  return shifted
-}
-
-function currentAppDateString(): string {
-  if (devDateOffsetDays === 0) return todayDateString()
-  const shifted = currentAppDate()
-  const year = shifted.getFullYear()
-  const month = String(shifted.getMonth() + 1).padStart(2, '0')
-  const day = String(shifted.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-/**
- * Appends one task event to the vault log, in the log file for the app's
- * current day — so with the dev offset active, events land in the simulated
- * day's file rather than the real date's.
- */
+/** Appends one task event to the vault log, using the currently saved vault path. */
 function logTaskEvent(event: TaskEvent): void {
-  appendTaskEvent(getVaultStatus(getDb()).path, event, currentAppDate())
+  appendTaskEvent(getVaultStatus(getDb()).path, event)
 }
 
 /**
@@ -98,7 +70,7 @@ function rolloverAndLog(dateString: string): ReturnType<typeof runLaunchRollover
  */
 function ensureTodayNoteFor(title: string, colour: string): ReturnType<typeof createNote> {
   const db = getDb()
-  const todayDate = currentAppDateString()
+  const todayDate = todayDateString()
   const existing = listNotesForDate(db, todayDate).find(
     (note) => note.title === title && note.colour === colour
   )
@@ -224,7 +196,7 @@ app.whenReady().then(() => {
   // reads since a sealed day's post-its never change.
   ipcMain.handle('notes:getForDay', (_event, dayOffset: number) => {
     const clampedOffset = Math.min(dayOffset, 0)
-    const today = parseDateString(currentAppDateString())
+    const today = parseDateString(todayDateString())
     const date = addDays(today, clampedOffset)
     const dateString = formatDateString(date)
     if (clampedOffset === 0) rolloverAndLog(dateString)
@@ -245,7 +217,7 @@ app.whenReady().then(() => {
   // Milestone 8b: "+ new post-it" on the board. Always created on today
   // (you can only add post-its to the day you're actively working in).
   ipcMain.handle('notes:create', (_event, title: string, colour: string) =>
-    createNote(getDb(), currentAppDateString(), title, colour)
+    createNote(getDb(), todayDateString(), title, colour)
   )
   ipcMain.handle('notes:rename', (_event, noteId: number, title: string) =>
     updateNoteTitle(getDb(), noteId, title)
@@ -277,7 +249,7 @@ app.whenReady().then(() => {
   ipcMain.handle('tasks:moveToToday', (_event, taskId: number) => {
     const sourceTask = getTaskById(taskId)
     const sourceNote = sourceTask ? getNoteById(getDb(), sourceTask.noteId) : null
-    rolloverAndLog(currentAppDateString())
+    rolloverAndLog(todayDateString())
     const targetNote = ensureTodayNoteFor(
       sourceNote?.title ?? DEFAULT_NOTE_TITLE,
       sourceNote?.colour ?? DEFAULT_NOTE_COLOUR
@@ -312,18 +284,6 @@ app.whenReady().then(() => {
     setVaultPath(getDb(), chosenPath)
     return getVaultStatus(getDb())
   })
-
-  // Dev-only: lets the renderer's "simulate next day" button advance the
-  // app's notion of "today" by one day and immediately re-run rollover, so
-  // rollover can be tested without waiting for the real clock to turn over.
-  if (is.dev) {
-    devDateOffsetDays = getDevDateOffset(getDb())
-    ipcMain.handle('dev:simulateNextDay', () => {
-      devDateOffsetDays += 1
-      setDevDateOffset(getDb(), devDateOffsetDays)
-      return rolloverAndLog(currentAppDateString())
-    })
-  }
 
   createWindow()
 
