@@ -94,4 +94,18 @@ describe('runLaunchRollover', () => {
     // Task A should still appear exactly once — not duplicated by a second rollover.
     expect(tasksOnNote(db, firstLaunch.id)).toEqual([{ title: 'Task A', status: 'open' }])
   })
+
+  it('does not pull tasks back from a later note when the clock moves backwards', () => {
+    const later = runLaunchRollover(db, '2026-09-28')
+    insertTask(db, later.id, 'Future task', 'open')
+
+    const earlier = runLaunchRollover(db, '2026-09-27')
+
+    expect(tasksOnNote(db, earlier.id)).toEqual([])
+    expect(tasksOnNote(db, later.id)).toEqual([{ title: 'Future task', status: 'open' }])
+    const reloaded = db.prepare('SELECT sealed FROM notes WHERE id = ?').get(later.id) as {
+      sealed: number
+    }
+    expect(reloaded.sealed).toBe(0)
+  })
 })

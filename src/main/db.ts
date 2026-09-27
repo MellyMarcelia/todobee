@@ -20,6 +20,8 @@ export function getDb(): Database.Database {
   const dbPath = join(app.getPath('userData'), 'todobee.db')
   db = new Database(dbPath)
   db.pragma('journal_mode = WAL')
+  // SQLite ignores REFERENCES constraints unless this is switched on per connection.
+  db.pragma('foreign_keys = ON')
   createSchema(db)
 
   return db

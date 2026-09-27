@@ -1,12 +1,21 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
-import { is } from '@electron-toolkit/utils'
 import type { Note, Task, NewTask, TaskStatus } from '../shared/types'
 
 // Custom API for the renderer — today's note + task CRUD (Milestone 2),
 // extended with launch rollover (Milestone 4). Each function just forwards
 // to an ipcMain.handle in src/main/index.ts and returns its result; the
 // renderer never touches SQLite or Node directly.
+//
+// Dev detection here can't use @electron-toolkit/utils's `is.dev` — that
+// reads Electron's `app` module, which only exists in the main process.
+// Importing it from a preload script throws at load time (app is undefined
+// here), which silently crashes the whole preload script before
+// contextBridge ever runs — leaving window.api completely undefined in the
+// renderer. ELECTRON_RENDERER_URL is only set by electron-vite in `npm run
+// dev`, so it's a safe dev/packaged signal from inside preload.
+const isDev = Boolean(process.env['ELECTRON_RENDERER_URL'])
+
 const api = {
   getTodayNote: (): Promise<Note> => ipcRenderer.invoke('todayNote:get'),
   listTasks: (noteId: number): Promise<Task[]> => ipcRenderer.invoke('tasks:list', noteId),
@@ -20,7 +29,7 @@ const api = {
   // Dev-only: advances the app's simulated "today" by one day and re-runs
   // rollover, so rollover can be tested without waiting for a real day to
   // pass. Only exposed in `npm run dev` — never present in a packaged build.
-  ...(is.dev
+  ...(isDev
     ? { simulateNextDay: (): Promise<Note> => ipcRenderer.invoke('dev:simulateNextDay') }
     : {})
 }

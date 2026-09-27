@@ -9,6 +9,7 @@ defineEmits<{ back: [] }>()
 // until it loads; the template guards on that so nothing renders too early.
 const note = ref<Note | null>(null)
 const tasks = ref<Task[]>([])
+const loadError = ref<string | null>(null)
 
 const newTaskTitle = ref('')
 const isAddingTask = ref(false)
@@ -18,10 +19,24 @@ const isAddingTask = ref(false)
 const editingTaskId = ref<number | null>(null)
 const editingTitle = ref('')
 
+// Focuses an input as soon as it's inserted. The plain `autofocus` attribute
+// isn't enough: Chromium only honors it once per page load, so the second
+// "tap to add…" or click-to-edit would show an unfocused input (and its
+// blur-to-save would never fire).
+const vFocus = { mounted: (el: HTMLElement) => el.focus() }
+
 async function loadTodayNote(): Promise<void> {
-  const todayNote = await window.api.getTodayNote()
-  note.value = todayNote
-  tasks.value = await window.api.listTasks(todayNote.id)
+  loadError.value = null
+  try {
+    const todayNote = await window.api.getTodayNote()
+    note.value = todayNote
+    tasks.value = await window.api.listTasks(todayNote.id)
+  } catch (error) {
+    // Without this, a failed IPC call left `note` as null forever and the
+    // whole post-it silently vanished with no visible error at all.
+    loadError.value = error instanceof Error ? error.message : String(error)
+    console.error('Failed to load today\'s note:', error)
+  }
 }
 
 onMounted(loadTodayNote)
@@ -30,12 +45,22 @@ onMounted(loadTodayNote)
 // only defined when running `npm run dev` (see preload/index.ts), so this
 // button and its handler simply don't exist in a packaged build.
 const isDev = import.meta.env.DEV
+const isSimulatingNextDay = ref(false)
 
 async function simulateNextDay(): Promise<void> {
-  if (!window.api.simulateNextDay) return
-  const newToday = await window.api.simulateNextDay()
-  note.value = newToday
-  tasks.value = await window.api.listTasks(newToday.id)
+  if (!window.api.simulateNextDay || isSimulatingNextDay.value) return
+  isSimulatingNextDay.value = true
+  loadError.value = null
+  try {
+    const newToday = await window.api.simulateNextDay()
+    note.value = newToday
+    tasks.value = await window.api.listTasks(newToday.id)
+  } catch (error) {
+    loadError.value = error instanceof Error ? error.message : String(error)
+    console.error('Failed to simulate next day:', error)
+  } finally {
+    isSimulatingNextDay.value = false
+  }
 }
 
 function startAddingTask(): void {
@@ -93,8 +118,15 @@ async function removeTask(task: Task): Promise<void> {
       </svg>
     </button>
 
-    <div v-if="note" class="note">
+    <div v-if="loadError" class="load-error">
+      <p>Couldn't load today's note.</p>
+      <p class="load-error-detail">{{ loadError }}</p>
+      <button class="load-error-retry" @click="loadTodayNote">Retry</button>
+    </div>
+
+    <div v-else-if="note" class="note">
       <h1 class="note-title">today's buzz</h1>
+      <p v-if="isDev" class="note-date-debug">{{ note.noteDate }}</p>
 
       <ul class="task-list">
         <li v-for="task in tasks" :key="task.id" class="task-row">
@@ -110,9 +142,9 @@ async function removeTask(task: Task): Promise<void> {
           <input
             v-if="editingTaskId === task.id"
             v-model="editingTitle"
+            v-focus
             class="task-text-input"
             type="text"
-            autofocus
             @keyup.enter="confirmEditTask(task)"
             @blur="confirmEditTask(task)"
           />
@@ -135,9 +167,9 @@ async function removeTask(task: Task): Promise<void> {
           <input
             v-if="isAddingTask"
             v-model="newTaskTitle"
+            v-focus
             class="task-text-input"
             type="text"
-            autofocus
             placeholder="type a task…"
             @keyup.enter="confirmAddTask"
             @blur="confirmAddTask"
@@ -153,10 +185,11 @@ async function removeTask(task: Task): Promise<void> {
       <button
         v-if="isDev"
         class="dev-next-day-button"
+        :disabled="isSimulatingNextDay"
         title="Dev only: simulate next day"
         @click="simulateNextDay"
       >
-        ⏭ next day
+        {{ isSimulatingNextDay ? '…' : '⏭ next day' }}
       </button>
     </div>
   </div>
@@ -199,6 +232,38 @@ async function removeTask(task: Task): Promise<void> {
   stroke-linejoin: round;
 }
 
+.load-error {
+  width: 100%;
+  max-width: 340px;
+  min-height: 420px;
+  background: var(--color-note);
+  border: var(--outline-width-thick) solid var(--color-note-border);
+  border-radius: var(--radius-note);
+  padding: 28px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  text-align: center;
+  color: var(--color-text);
+}
+
+.load-error-detail {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  word-break: break-word;
+}
+
+.load-error-retry {
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: var(--outline-width) solid var(--color-ink);
+  background: #fff8ea;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
 .note {
   position: relative;
   width: 100%;
@@ -216,6 +281,13 @@ async function removeTask(task: Task): Promise<void> {
 .note-title {
   text-align: center;
   font-size: 1.5rem;
+}
+
+.note-date-debug {
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  margin-top: -12px;
 }
 
 .task-list {

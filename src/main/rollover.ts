@@ -42,15 +42,16 @@ export function runLaunchRollover(db: Database.Database, todayDate: string): Not
     // The previous note is the most recent unsealed note. In normal use
     // there's at most one unsealed note at a time (today's, until it rolls
     // over), so this also self-heals if rollover was ever skipped for a day.
+    // Only notes *before* today count: if the clock ever moves backwards
+    // (timezone travel, or restarting after the dev "next day" button), a
+    // later-dated note must not have its tasks pulled back and get sealed.
     const previous = db
-      .prepare<[], NoteRow>(
-        'SELECT * FROM notes WHERE sealed = 0 ORDER BY note_date DESC LIMIT 1'
+      .prepare<[string], NoteRow>(
+        'SELECT * FROM notes WHERE sealed = 0 AND note_date < ? ORDER BY note_date DESC LIMIT 1'
       )
-      .get()
+      .get(todayDate)
 
-    const insertResult = db
-      .prepare('INSERT INTO notes (note_date) VALUES (?)')
-      .run(todayDate)
+    const insertResult = db.prepare('INSERT INTO notes (note_date) VALUES (?)').run(todayDate)
     const todayId = insertResult.lastInsertRowid as number
 
     if (previous) {

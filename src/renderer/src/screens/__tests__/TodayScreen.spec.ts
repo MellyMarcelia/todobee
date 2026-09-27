@@ -35,9 +35,11 @@ describe('TodayScreen — adding a task', () => {
     window.api = {
       getTodayNote: vi.fn().mockResolvedValue(fakeNote),
       listTasks: vi.fn().mockResolvedValue([]),
-      createTask: vi.fn().mockImplementation(async (_noteId: number, input: { title: string }) =>
-        makeTask(nextId++, input.title)
-      ),
+      createTask: vi
+        .fn()
+        .mockImplementation(async (_noteId: number, input: { title: string }) =>
+          makeTask(nextId++, input.title)
+        ),
       updateTaskTitle: vi.fn(),
       setTaskStatus: vi.fn(),
       deleteTask: vi.fn()

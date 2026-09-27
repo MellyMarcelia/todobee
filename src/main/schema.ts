@@ -30,7 +30,7 @@ export function createSchema(db: Database.Database): void {
   // Migration for local dev databases created before `sealed` existed.
   // CREATE TABLE IF NOT EXISTS won't add the column to an already-existing
   // notes table, so add it by hand if it's missing.
-  const columns = db.prepare("PRAGMA table_info(notes)").all() as { name: string }[]
+  const columns = db.prepare('PRAGMA table_info(notes)').all() as { name: string }[]
   const hasSealed = columns.some((column) => column.name === 'sealed')
   if (!hasSealed) {
     db.exec('ALTER TABLE notes ADD COLUMN sealed INTEGER NOT NULL DEFAULT 0')

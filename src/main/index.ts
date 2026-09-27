@@ -87,8 +87,6 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  ipcMain.on('ping', () => console.log('pong')) // demo IPC handshake — remove once real IPC channels exist
-
   // Today's note + task CRUD (Milestone 2, extended with rollover in
   // Milestone 4). Each handler is a thin wrapper around tasksRepo/rollover —
   // the actual SQL lives there, this just wires it to IPC.

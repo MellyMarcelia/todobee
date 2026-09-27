@@ -25,7 +25,9 @@ function toTask(row: TaskRow): Task {
 export function listTasksForNote(noteId: number): Task[] {
   const db = getDb()
   const rows = db
-    .prepare<[number], TaskRow>('SELECT * FROM tasks WHERE note_id = ? ORDER BY created_at ASC, id ASC')
+    .prepare<[number], TaskRow>(
+      'SELECT * FROM tasks WHERE note_id = ? ORDER BY created_at ASC, id ASC'
+    )
     .all(noteId)
   return rows.map(toTask)
 }
