@@ -1,7 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import Database from 'better-sqlite3'
 import { createSchema } from '../schema'
-import { getVaultPath, setVaultPath, getVaultStatus } from '../settingsRepo'
+import {
+  getVaultPath,
+  setVaultPath,
+  getVaultStatus,
+  getDevDateOffset,
+  setDevDateOffset
+} from '../settingsRepo'
 
 vi.mock('fs', () => {
   const existsSync = vi.fn()
@@ -56,5 +62,15 @@ describe('settingsRepo', () => {
       path: '/Users/melly/Documents/deleted-vault',
       exists: false
     })
+  })
+
+  it('reports a dev date offset of 0 until one is saved', () => {
+    expect(getDevDateOffset(db)).toBe(0)
+  })
+
+  it('saves and replaces the dev date offset', () => {
+    setDevDateOffset(db, 1)
+    setDevDateOffset(db, 3)
+    expect(getDevDateOffset(db)).toBe(3)
   })
 })

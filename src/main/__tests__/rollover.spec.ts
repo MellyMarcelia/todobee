@@ -88,7 +88,7 @@ describe('runLaunchRollover', () => {
     ])
   })
 
-  it('creates a new post-it on today matching each of yesterday\'s post-its that had unfinished tasks', () => {
+  it("creates a new post-it on today matching each of yesterday's post-its that had unfinished tasks", () => {
     const yesterday = runLaunchRollover(db, '2026-09-27')
     const defaultNote = yesterday.notes[0]
     const schoolNote = insertNote(db, '2026-09-27', 'School', '#4A90D9')
@@ -129,7 +129,7 @@ describe('runLaunchRollover', () => {
     ])
   })
 
-  it('seals every one of the previous day\'s post-its', () => {
+  it("seals every one of the previous day's post-its", () => {
     const yesterday = runLaunchRollover(db, '2026-09-27')
     const schoolNote = insertNote(db, '2026-09-27', 'School', '#4A90D9')
 
@@ -157,7 +157,7 @@ describe('runLaunchRollover', () => {
     expect(tasksOnNote(db, firstLaunch.notes[0].id)).toEqual([{ title: 'Task A', status: 'open' }])
   })
 
-  it('does not pull tasks back from a later day\'s notes when the clock moves backwards', () => {
+  it("does not pull tasks back from a later day's notes when the clock moves backwards", () => {
     const later = runLaunchRollover(db, '2026-09-28')
     insertTask(db, later.notes[0].id, 'Future task', 'open')
 
@@ -190,5 +190,58 @@ describe('runLaunchRollover', () => {
 
     const relaunch = runLaunchRollover(db, '2026-09-28')
     expect(relaunch.movedTasks).toEqual([])
+  })
+
+  it('still rolls over when the new day already has a post-it from an earlier visit', () => {
+    // Dev "next day" button visited 09-28 and left a sealed note there, then
+    // the app restarted back on 09-27 and a new post-it got a task.
+    const staleFuture = insertNote(db, '2026-09-28', DEFAULT_NOTE_TITLE, DEFAULT_NOTE_COLOUR, 1)
+    const school = insertNote(db, '2026-09-27', 'School', '#7FB069')
+    insertTask(db, school, 'Finish assignments', 'open')
+
+    const result = runLaunchRollover(db, '2026-09-28')
+
+    const schoolToday = result.notes.find((n) => n.title === 'School')
+    expect(schoolToday).toBeDefined()
+    expect(tasksOnNote(db, schoolToday!.id)).toEqual([
+      { title: 'Finish assignments', status: 'open' }
+    ])
+    expect(result.movedTasks).toEqual([
+      { title: 'Finish assignments', fromDate: '2026-09-27', noteTitle: 'School' }
+    ])
+    // Today's post-its are editable again, and the old one is sealed.
+    expect(result.notes.every((n) => !n.sealed)).toBe(true)
+    expect(result.notes.map((n) => n.id)).toContain(staleFuture)
+    const oldSchool = db.prepare('SELECT sealed FROM notes WHERE id = ?').get(school) as {
+      sealed: number
+    }
+    expect(oldSchool.sealed).toBe(1)
+  })
+
+  it('moves unfinished tasks onto an existing matching post-it already on today', () => {
+    const todayNote = insertNote(db, '2026-09-28')
+    insertTask(db, todayNote, 'Already here', 'open')
+    const yesterdayNote = insertNote(db, '2026-09-27')
+    insertTask(db, yesterdayNote, 'Carried over', 'open')
+
+    const result = runLaunchRollover(db, '2026-09-28')
+
+    expect(notesForDate(db, '2026-09-28')).toHaveLength(1)
+    expect(tasksOnNote(db, result.notes[0].id)).toEqual([
+      { title: 'Already here', status: 'open' },
+      { title: 'Carried over', status: 'open' }
+    ])
+  })
+
+  it('pins a carried-over post-it where the original was on the board', () => {
+    const yesterdayNote = insertNote(db, '2026-09-27', 'School', '#7FB069')
+    db.prepare('UPDATE notes SET board_x = 44, board_y = 65 WHERE id = ?').run(yesterdayNote)
+    insertTask(db, yesterdayNote, 'Finish assignments', 'open')
+
+    const result = runLaunchRollover(db, '2026-09-28')
+
+    const school = result.notes.find((n) => n.title === 'School')
+    expect(school?.boardX).toBe(44)
+    expect(school?.boardY).toBe(65)
   })
 })

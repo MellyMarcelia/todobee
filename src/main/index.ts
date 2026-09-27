@@ -4,9 +4,17 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { getDb } from './db'
 import { runLaunchRollover } from './rollover'
-import { getVaultStatus, setVaultPath } from './settingsRepo'
+import { getVaultStatus, setVaultPath, getDevDateOffset, setDevDateOffset } from './settingsRepo'
 import { appendTaskEvent } from './obsidianLogger'
-import { listNotesForDate, getNoteById, createNote, updateNoteTitle, setNotePosition } from './notesRepo'
+import type { TaskEvent } from './obsidianLogger'
+import {
+  listNotesForDate,
+  getNoteById,
+  createNote,
+  updateNoteTitle,
+  setNotePosition,
+  deleteNote
+} from './notesRepo'
 import { recalculatePerfectDay } from './perfectDay'
 import { parseDateString, addDays, formatDateString, formatLongDate } from './dateUtils'
 import {
@@ -31,18 +39,36 @@ function todayDateString(): string {
 }
 
 // Dev-only "simulate next day" helper (Milestone 4). Lets you test rollover
-// without waiting for the system clock to roll over. Only exists while
-// `is.dev` is true — never present in a packaged build.
+// without waiting for the system clock to roll over. Only used while
+// `is.dev` is true — never present in a packaged build. The offset is saved
+// in the settings table so it survives restarts: when it lived only in
+// memory, restarting jumped the app back to the real date and stranded any
+// tasks already moved onto the simulated days.
 let devDateOffsetDays = 0
+
+/** "Now" as the app sees it: the real clock, shifted by the dev offset (always 0 in production). */
+function currentAppDate(): Date {
+  const shifted = new Date()
+  shifted.setDate(shifted.getDate() + devDateOffsetDays)
+  return shifted
+}
 
 function currentAppDateString(): string {
   if (devDateOffsetDays === 0) return todayDateString()
-  const shifted = new Date()
-  shifted.setDate(shifted.getDate() + devDateOffsetDays)
+  const shifted = currentAppDate()
   const year = shifted.getFullYear()
   const month = String(shifted.getMonth() + 1).padStart(2, '0')
   const day = String(shifted.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
+}
+
+/**
+ * Appends one task event to the vault log, in the log file for the app's
+ * current day — so with the dev offset active, events land in the simulated
+ * day's file rather than the real date's.
+ */
+function logTaskEvent(event: TaskEvent): void {
+  appendTaskEvent(getVaultStatus(getDb()).path, event, currentAppDate())
 }
 
 /**
@@ -52,9 +78,8 @@ function currentAppDateString(): string {
  */
 function rolloverAndLog(dateString: string): ReturnType<typeof runLaunchRollover> {
   const result = runLaunchRollover(getDb(), dateString)
-  const vaultPath = getVaultStatus(getDb()).path
   for (const moved of result.movedTasks) {
-    appendTaskEvent(vaultPath, {
+    logTaskEvent({
       type: 'task.edited',
       status: 'open',
       title: moved.title,
@@ -144,7 +169,7 @@ app.whenReady().then(() => {
     const created = createTask(noteId, input)
     recalculatePerfectDay(getDb(), noteId)
     const note = getNoteById(getDb(), noteId)
-    appendTaskEvent(getVaultStatus(getDb()).path, {
+    logTaskEvent({
       type: 'task.created',
       status: created.status,
       title: created.title,
@@ -155,7 +180,7 @@ app.whenReady().then(() => {
   ipcMain.handle('tasks:updateTitle', (_event, taskId: number, title: string) => {
     const updated = updateTaskTitle(taskId, title)
     const note = getNoteById(getDb(), updated.noteId)
-    appendTaskEvent(getVaultStatus(getDb()).path, {
+    logTaskEvent({
       type: 'task.edited',
       status: updated.status,
       title: updated.title,
@@ -167,7 +192,7 @@ app.whenReady().then(() => {
     const updated = setTaskStatus(taskId, status)
     recalculatePerfectDay(getDb(), updated.noteId)
     const note = getNoteById(getDb(), updated.noteId)
-    appendTaskEvent(getVaultStatus(getDb()).path, {
+    logTaskEvent({
       type: status === 'done' ? 'task.completed' : 'task.reopened',
       status: updated.status,
       title: updated.title,
@@ -181,7 +206,7 @@ app.whenReady().then(() => {
     if (task) {
       recalculatePerfectDay(getDb(), task.noteId)
       const note = getNoteById(getDb(), task.noteId)
-      appendTaskEvent(getVaultStatus(getDb()).path, {
+      logTaskEvent({
         type: 'task.deleted',
         status: task.status,
         title: task.title,
@@ -225,6 +250,24 @@ app.whenReady().then(() => {
   ipcMain.handle('notes:rename', (_event, noteId: number, title: string) =>
     updateNoteTitle(getDb(), noteId, title)
   )
+  // Deleting a whole post-it (the ✕ on today's board). Sealed history can't
+  // be deleted — same rule as tasks on a past post-it. Every task on it is
+  // logged as task.deleted, so removing a post-it never silently drops tasks
+  // from the vault log.
+  ipcMain.handle('notes:delete', (_event, noteId: number) => {
+    const note = getNoteById(getDb(), noteId)
+    if (!note) return
+    if (note.sealed) throw new Error(`"${note.title}" is read-only history and can't be deleted.`)
+    const deletedTasks = deleteNote(getDb(), noteId)
+    for (const task of deletedTasks) {
+      logTaskEvent({
+        type: 'task.deleted',
+        status: task.status,
+        title: task.title,
+        noteTitle: note.title
+      })
+    }
+  })
 
   // Reopening a done task on a past (read-only) note, after the user
   // confirms "move this task to today?". Finds (or creates) the post-it on
@@ -242,7 +285,7 @@ app.whenReady().then(() => {
     const moved = moveTaskToNote(taskId, targetNote.id)
     if (sourceTask) recalculatePerfectDay(getDb(), sourceTask.noteId)
     recalculatePerfectDay(getDb(), targetNote.id)
-    appendTaskEvent(getVaultStatus(getDb()).path, {
+    logTaskEvent({
       type: 'task.reopened',
       status: moved.status,
       title: moved.title,
@@ -260,7 +303,9 @@ app.whenReady().then(() => {
   ipcMain.handle('vault:chooseFolder', async () => {
     const mainWindow = BrowserWindow.getFocusedWindow()
     const result = mainWindow
-      ? await dialog.showOpenDialog(mainWindow, { properties: ['openDirectory', 'createDirectory'] })
+      ? await dialog.showOpenDialog(mainWindow, {
+          properties: ['openDirectory', 'createDirectory']
+        })
       : await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] })
     if (result.canceled || result.filePaths.length === 0) return null
     const chosenPath = result.filePaths[0]
@@ -272,8 +317,10 @@ app.whenReady().then(() => {
   // app's notion of "today" by one day and immediately re-run rollover, so
   // rollover can be tested without waiting for the real clock to turn over.
   if (is.dev) {
+    devDateOffsetDays = getDevDateOffset(getDb())
     ipcMain.handle('dev:simulateNextDay', () => {
       devDateOffsetDays += 1
+      setDevDateOffset(getDb(), devDateOffsetDays)
       return rolloverAndLog(currentAppDateString())
     })
   }
