@@ -35,14 +35,16 @@ export interface NewTask {
 }
 
 /**
- * A single week of history (Monday-to-Sunday) plus a label for the arrow
- * navigation, e.g. "week 39". weekOffset 0 is the current week, -1 is last
- * week, etc. — the board passes this straight back in to page between weeks.
+ * One calendar day of history for the board — one day at a time (not a
+ * week). dayOffset 0 is today, -1 is yesterday, etc.; canGoForward is false
+ * once dayOffset reaches 0, since browsing is never allowed into the future.
  */
-export interface WeekResult {
-  notes: Note[]
-  weekLabel: string
-  weekOffset: number
+export interface DayResult {
+  note: Note | null
+  dateLabel: string
+  dayOffset: number
+  isToday: boolean
+  canGoForward: boolean
 }
 
 /**

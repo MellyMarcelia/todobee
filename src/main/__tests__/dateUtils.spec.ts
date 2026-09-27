@@ -5,7 +5,8 @@ import {
   addDays,
   mondayOf,
   isoWeekNumber,
-  formatShortDate
+  formatShortDate,
+  formatLongDate
 } from '../dateUtils'
 
 describe('formatDateString / parseDateString', () => {
@@ -65,5 +66,17 @@ describe('formatShortDate', () => {
 
   it('does not zero-pad the day', () => {
     expect(formatShortDate(parseDateString('2026-01-05'))).toBe('Jan 5')
+  })
+})
+
+describe('formatLongDate', () => {
+  it('formats a date as "Ddd D Mon YYYY"', () => {
+    // 2026-09-27 is a Sunday.
+    expect(formatLongDate(parseDateString('2026-09-27'))).toBe('Sun 27 Sep 2026')
+  })
+
+  it('does not zero-pad the day', () => {
+    // 2026-01-05 is a Monday.
+    expect(formatLongDate(parseDateString('2026-01-05'))).toBe('Mon 5 Jan 2026')
   })
 })

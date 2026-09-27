@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
-import type { Note, Task, NewTask, TaskStatus, VaultStatus, WeekResult } from '../shared/types'
+import type { Note, Task, NewTask, TaskStatus, VaultStatus, DayResult } from '../shared/types'
 
 // Custom API for the renderer — today's note + task CRUD (Milestone 2),
 // extended with launch rollover (Milestone 4). Each function just forwards
@@ -26,9 +26,9 @@ const api = {
   setTaskStatus: (taskId: number, status: TaskStatus): Promise<Task> =>
     ipcRenderer.invoke('tasks:setStatus', taskId, status),
   deleteTask: (taskId: number): Promise<void> => ipcRenderer.invoke('tasks:delete', taskId),
-  // Milestone 7: history board.
-  listNotesForWeek: (weekOffset: number): Promise<WeekResult> =>
-    ipcRenderer.invoke('notes:listWeek', weekOffset),
+  // Milestone 7 (revised): history board, one day at a time.
+  getDayForOffset: (dayOffset: number): Promise<DayResult> =>
+    ipcRenderer.invoke('notes:getForDay', dayOffset),
   getNoteByDate: (noteDate: string): Promise<Note | null> =>
     ipcRenderer.invoke('notes:getByDate', noteDate),
   moveTaskToToday: (taskId: number): Promise<Task> =>

@@ -3,82 +3,54 @@ import { ref, onMounted, watch, nextTick } from 'vue'
 import Bee from '../components/Bee.vue'
 import PinIcon from '../components/icons/PinIcon.vue'
 import GearIcon from '../components/icons/GearIcon.vue'
-import type { VaultStatus, WeekResult, Note } from '../../../shared/types'
+import goodJobStamp from '../assets/stamps/good-job-stamp.png'
+import type { VaultStatus, DayResult, Note } from '../../../shared/types'
 
 const emit = defineEmits<{ open: [noteDate: string]; 'open-settings': [] }>()
 
-// Milestone 7: real notes from SQLite, one week (Mon-Sun, max 7 notes) at a
-// time. weekOffset 0 = the week containing today, -1 = last week, etc. —
-// the arrows page this back and forth; the main process does all the date
-// math (see notes:listWeek in main/index.ts) so the renderer just displays
-// whatever week it's told about.
-const weekOffset = ref(0)
-const week = ref<WeekResult | null>(null)
+// Milestone 7 (revised): history board, one day at a time. dayOffset 0 is
+// today, negative is further into the past — the main process does all the
+// date math (see notes:getForDay in main/index.ts) and also caps forward
+// paging at today, so the renderer never has to reason about "the future".
+const dayOffset = ref(0)
+const day = ref<DayResult | null>(null)
 const loadError = ref<string | null>(null)
 
-async function loadWeek(): Promise<void> {
+async function loadDay(): Promise<void> {
   loadError.value = null
   try {
-    week.value = await window.api.listNotesForWeek(weekOffset.value)
+    day.value = await window.api.getDayForOffset(dayOffset.value)
   } catch (error) {
     loadError.value = error instanceof Error ? error.message : String(error)
-    console.error('Failed to load week:', error)
+    console.error('Failed to load day:', error)
   }
 }
 
-onMounted(loadWeek)
-watch(weekOffset, loadWeek)
+onMounted(loadDay)
+watch(dayOffset, loadDay)
 
-function previousWeek(): void {
-  weekOffset.value -= 1
+function previousDay(): void {
+  dayOffset.value -= 1
 }
 
-function nextWeek(): void {
-  weekOffset.value += 1
+function nextDay(): void {
+  if (day.value?.canGoForward) dayOffset.value += 1
 }
-
-// Today's note (if it exists in the current week) is shown big and first,
-// labeled "today". Every other note in the week is a smaller pinned note,
-// newest first. todayDateString mirrors the same local-date logic used in
-// main/index.ts, so "is this today's note" agrees with what the main
-// process considers today.
-function todayDateString(): string {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  const day = String(now.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-const todayNote = ref<Note | null>(null)
-const pastNotes = ref<Note[]>([])
-
-watch(week, (value) => {
-  if (!value) {
-    todayNote.value = null
-    pastNotes.value = []
-    return
-  }
-  const today = todayDateString()
-  todayNote.value = value.notes.find((note) => note.noteDate === today) ?? null
-  pastNotes.value = value.notes.filter((note) => note.noteDate !== today)
-})
 
 // A little pin color per note, purely cosmetic — cycles through a small
-// fixed set so the board doesn't look monotone.
+// fixed set so the board doesn't look monotone across days.
 const pinColors = ['#E76F51', '#4A90D9', '#E9A23B', '#7FB069']
 
 function pinColorFor(index: number): string {
   return pinColors[index % pinColors.length]
 }
 
-// Milestone 7 follow-up: dragging notes around the board. Each note gets an
-// absolute pixel position within `.notes-area` — either a saved boardX/boardY
-// from SQLite (if the user has dragged it before) or a computed default spot
-// (today's note centered near the top, past notes in a row below). Dragging
-// uses plain pointer events (no library needed) with a small movement
-// threshold so a quick click still opens the note instead of being eaten by
-// the drag handler.
+// Milestone 7 follow-up: dragging the note around the board. It gets an
+// absolute pixel position within `.notes-area` — either a saved
+// boardX/boardY from SQLite (if the user has dragged it before) or a
+// computed default spot. Dragging uses plain pointer events (no library
+// needed) with a small movement threshold so a quick click still opens the
+// note instead of being eaten by the drag handler.
 const DRAG_THRESHOLD_PX = 4
 const notesAreaRef = ref<HTMLElement | null>(null)
 
@@ -93,28 +65,24 @@ interface DragState {
 }
 
 const dragState = ref<DragState | null>(null)
-// Live positions shown while dragging/after a drag, keyed by note id — kept
+// Live position shown while dragging/after a drag, keyed by note id — kept
 // separate from the note's own boardX/boardY so we don't have to mutate the
-// props-like `note` objects directly.
+// props-like `note` object directly.
 const livePositions = ref<Record<number, { x: number; y: number }>>({})
 
-function defaultPositionFor(index: number, isToday: boolean): { x: number; y: number } {
-  if (isToday) return { x: 130, y: 8 }
-  const perRow = 4
-  const col = index % perRow
-  const row = Math.floor(index / perRow)
-  return { x: 20 + col * 110, y: 150 + row * 110 }
+function defaultPosition(): { x: number; y: number } {
+  return { x: 130, y: 40 }
 }
 
-function positionFor(note: Note, index: number, isToday: boolean): { x: number; y: number } {
+function positionFor(note: Note): { x: number; y: number } {
   const live = livePositions.value[note.id]
   if (live) return live
   if (note.boardX !== null && note.boardY !== null) return { x: note.boardX, y: note.boardY }
-  return defaultPositionFor(index, isToday)
+  return defaultPosition()
 }
 
-function startDrag(event: PointerEvent, note: Note, index: number, isToday: boolean): void {
-  const current = positionFor(note, index, isToday)
+function startDrag(event: PointerEvent, note: Note): void {
+  const current = positionFor(note)
   dragState.value = {
     noteId: note.id,
     pointerId: event.pointerId,
@@ -137,8 +105,8 @@ function onDragMove(event: PointerEvent): void {
   drag.moved = true
 
   const areaRect = notesAreaRef.value?.getBoundingClientRect()
-  const maxX = areaRect ? areaRect.width - 90 : 9999
-  const maxY = areaRect ? areaRect.height - 90 : 9999
+  const maxX = areaRect ? areaRect.width - 120 : 9999
+  const maxY = areaRect ? areaRect.height - 120 : 9999
 
   livePositions.value = {
     ...livePositions.value,
@@ -149,30 +117,23 @@ function onDragMove(event: PointerEvent): void {
   }
 }
 
-async function endDrag(event: PointerEvent, note: Note, index: number, isToday: boolean): Promise<void> {
+async function endDrag(event: PointerEvent, note: Note): Promise<void> {
   const drag = dragState.value
   if (!drag || event.pointerId !== drag.pointerId) return
   dragState.value = null
 
   if (!drag.moved) {
     // A click, not a drag — open the note as usual.
-    emitOpen(note.noteDate)
+    emit('open', note.noteDate)
     return
   }
 
-  const final = positionFor(note, index, isToday)
+  const final = positionFor(note)
   try {
     await window.api.setNotePosition(note.id, final.x, final.y)
   } catch (error) {
     console.error('Failed to save note position:', error)
   }
-}
-
-// defineEmits already declared above with `open`/`open-settings`; grab a
-// handle to it so the drag-end handler (which isn't a template event) can
-// emit "open" itself for the click-not-drag case.
-function emitOpen(noteDate: string): void {
-  emit('open', noteDate)
 }
 
 // Milestone 5: show a warning banner when no vault is chosen yet, or when
@@ -190,9 +151,9 @@ async function loadVaultStatus(): Promise<void> {
 
 onMounted(loadVaultStatus)
 
-// Reset drag-in-progress live positions when the week changes, so an old
-// drag from a different week's note (now unmounted) can't leak in.
-watch(week, () => {
+// Reset drag-in-progress live positions when the day changes, so an old
+// drag from a different day's note (now unmounted) can't leak in.
+watch(day, () => {
   nextTick(() => {
     livePositions.value = {}
   })
@@ -209,10 +170,17 @@ watch(week, () => {
         </button>
       </div>
 
-      <div class="week-nav">
-        <button class="week-arrow" aria-label="Previous week" @click="previousWeek">‹</button>
-        <span class="week-label">{{ week?.weekLabel ?? '…' }}</span>
-        <button class="week-arrow" aria-label="Next week" @click="nextWeek">›</button>
+      <div class="day-nav">
+        <button class="day-arrow" aria-label="Previous day" @click="previousDay">‹</button>
+        <span class="day-label">{{ day?.dateLabel ?? '…' }}</span>
+        <button
+          class="day-arrow"
+          aria-label="Next day"
+          :disabled="!day?.canGoForward"
+          @click="nextDay"
+        >
+          ›
+        </button>
       </div>
 
       <p v-if="vaultStatus && !vaultStatus.path" class="warning-banner">
@@ -221,50 +189,31 @@ watch(week, () => {
       <p v-else-if="vaultStatus && !vaultStatus.exists" class="warning-banner">
         Your vault folder can't be found, choose it again
       </p>
-      <p v-if="loadError" class="warning-banner">Couldn't load this week: {{ loadError }}</p>
+      <p v-if="loadError" class="warning-banner">Couldn't load this day: {{ loadError }}</p>
 
       <div ref="notesAreaRef" class="notes-area">
         <button
-          v-if="todayNote"
+          v-if="day?.note"
           class="pinned-note pinned-note-today"
           :style="{
-            background: '#F6C56A',
-            left: `${positionFor(todayNote, -1, true).x}px`,
-            top: `${positionFor(todayNote, -1, true).y}px`
+            background: day.isToday ? '#F6C56A' : '#9FD8A3',
+            left: `${positionFor(day.note).x}px`,
+            top: `${positionFor(day.note).y}px`
           }"
-          @pointerdown="startDrag($event, todayNote, -1, true)"
+          @pointerdown="startDrag($event, day.note)"
           @pointermove="onDragMove"
-          @pointerup="endDrag($event, todayNote, -1, true)"
+          @pointerup="endDrag($event, day.note)"
         >
-          <span class="pin"><PinIcon color="#E76F51" /></span>
-          <span class="today-label">today</span>
+          <span class="pin"><PinIcon :color="pinColorFor(0)" /></span>
+          <span v-if="day.isToday" class="today-label">today</span>
+          <img v-if="day.note.perfectDay" :src="goodJobStamp" alt="Good job" class="mini-stamp" />
           <span class="pinned-note-lines">
             <span class="line" />
             <span class="line short" />
           </span>
         </button>
 
-        <button
-          v-for="(note, i) in pastNotes"
-          :key="note.id"
-          class="pinned-note"
-          :style="{
-            background: i % 2 === 0 ? '#9FD8A3' : '#F2A6C4',
-            left: `${positionFor(note, i, false).x}px`,
-            top: `${positionFor(note, i, false).y}px`
-          }"
-          @pointerdown="startDrag($event, note, i, false)"
-          @pointermove="onDragMove"
-          @pointerup="endDrag($event, note, i, false)"
-        >
-          <span class="pin"><PinIcon :color="pinColorFor(i)" /></span>
-          <span class="pinned-note-lines">
-            <span class="line" />
-            <span class="line short" />
-          </span>
-        </button>
-
-        <p v-if="week && week.notes.length === 0" class="empty-week">Nothing here yet</p>
+        <p v-else-if="day" class="empty-day">Nothing here yet</p>
       </div>
     </section>
 
@@ -322,7 +271,7 @@ watch(week, () => {
   cursor: pointer;
 }
 
-.week-nav {
+.day-nav {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -330,7 +279,7 @@ watch(week, () => {
   margin-top: -14px;
 }
 
-.week-arrow {
+.day-arrow {
   border: none;
   background: transparent;
   color: #fff8ea;
@@ -340,10 +289,15 @@ watch(week, () => {
   padding: 2px 6px;
 }
 
-.week-label {
+.day-arrow:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.day-label {
   font-size: 0.85rem;
   color: #fff8ea;
-  min-width: 130px;
+  min-width: 160px;
   text-align: center;
 }
 
@@ -369,7 +323,7 @@ watch(week, () => {
   min-height: 340px;
 }
 
-.empty-week {
+.empty-day {
   color: rgba(255, 248, 234, 0.7);
   font-size: 0.8rem;
   text-align: center;
@@ -433,6 +387,15 @@ watch(week, () => {
 
 .line.short {
   width: 60%;
+}
+
+.mini-stamp {
+  position: absolute;
+  bottom: -6px;
+  right: -6px;
+  width: 28px;
+  transform: rotate(-10deg);
+  pointer-events: none;
 }
 
 .desk {

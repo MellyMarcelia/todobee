@@ -6,9 +6,9 @@ import { getDb } from './db'
 import { runLaunchRollover } from './rollover'
 import { getVaultStatus, setVaultPath } from './settingsRepo'
 import { appendTaskEvent } from './obsidianLogger'
-import { listNotesForWeek, getNoteByDate, setNotePosition } from './notesRepo'
+import { getNoteByDate, setNotePosition } from './notesRepo'
 import { recalculatePerfectDay } from './perfectDay'
-import { formatDateString, parseDateString, addDays, mondayOf, formatShortDate } from './dateUtils'
+import { parseDateString, addDays, formatDateString, formatLongDate } from './dateUtils'
 import {
   listTasksForNote,
   getTaskById,
@@ -163,20 +163,23 @@ app.whenReady().then(() => {
     }
   })
 
-  // Milestone 7: history board. weekOffset 0 = the week containing today,
-  // -1 = the previous week, etc. — max 7 notes per week since each week has
-  // at most one note per calendar day. Label is the week's date range
-  // (e.g. "Sep 28 – Oct 4") rather than a week number, since dates read more
-  // naturally than "week 39" at a glance.
-  ipcMain.handle('notes:listWeek', (_event, weekOffset: number) => {
+  // Milestone 7 (revised): history board, one day at a time. dayOffset 0 is
+  // today, -1 is yesterday, etc. — browsing is capped at today (canGoForward
+  // is false once dayOffset reaches 0) since there's never a future note to
+  // look at. note is null for a day that has no note yet (no tasks were ever
+  // created/rolled onto it).
+  ipcMain.handle('notes:getForDay', (_event, dayOffset: number) => {
+    const clampedOffset = Math.min(dayOffset, 0)
     const today = parseDateString(currentAppDateString())
-    const monday = addDays(mondayOf(today), weekOffset * 7)
-    const sunday = addDays(monday, 6)
-    const notes = listNotesForWeek(getDb(), formatDateString(monday), formatDateString(sunday))
+    const date = addDays(today, clampedOffset)
+    const dateString = formatDateString(date)
+    const note = getNoteByDate(getDb(), dateString)
     return {
-      notes,
-      weekLabel: `${formatShortDate(monday)} – ${formatShortDate(sunday)}`,
-      weekOffset
+      note,
+      dateLabel: formatLongDate(date),
+      dayOffset: clampedOffset,
+      isToday: clampedOffset === 0,
+      canGoForward: clampedOffset < 0
     }
   })
   ipcMain.handle('notes:getByDate', (_event, noteDate: string) => getNoteByDate(getDb(), noteDate))

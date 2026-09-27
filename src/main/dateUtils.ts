@@ -64,3 +64,10 @@ const SHORT_MONTH_NAMES = [
 export function formatShortDate(date: Date): string {
   return `${SHORT_MONTH_NAMES[date.getMonth()]} ${date.getDate()}`
 }
+
+const SHORT_DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+/** Formats a Date as "Ddd D Mon YYYY" (e.g. "Sun 27 Sep 2026") for the board's day header. */
+export function formatLongDate(date: Date): string {
+  return `${SHORT_DAY_NAMES[date.getDay()]} ${date.getDate()} ${SHORT_MONTH_NAMES[date.getMonth()]} ${date.getFullYear()}`
+}

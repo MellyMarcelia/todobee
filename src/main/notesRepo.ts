@@ -27,20 +27,6 @@ function toNote(row: NoteRow): Note {
   }
 }
 
-/**
- * Notes with note_date between startDate and endDate (both inclusive,
- * "YYYY-MM-DD" strings), newest first — used to show one calendar week of
- * history at a time on the board.
- */
-export function listNotesForWeek(db: Database.Database, startDate: string, endDate: string): Note[] {
-  const rows = db
-    .prepare<[string, string], NoteRow>(
-      'SELECT * FROM notes WHERE note_date >= ? AND note_date <= ? ORDER BY note_date DESC'
-    )
-    .all(startDate, endDate)
-  return rows.map(toNote)
-}
-
 /** The note for a specific calendar date, or null if none exists yet. */
 export function getNoteByDate(db: Database.Database, noteDate: string): Note | null {
   const row = db

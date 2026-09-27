@@ -1,5 +1,5 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
-import type { Note, Task, NewTask, TaskStatus, VaultStatus, WeekResult } from '../shared/types'
+import type { Note, Task, NewTask, TaskStatus, VaultStatus, DayResult } from '../shared/types'
 
 interface TodobeeApi {
   getTodayNote: () => Promise<Note>
@@ -8,7 +8,7 @@ interface TodobeeApi {
   updateTaskTitle: (taskId: number, title: string) => Promise<Task>
   setTaskStatus: (taskId: number, status: TaskStatus) => Promise<Task>
   deleteTask: (taskId: number) => Promise<void>
-  listNotesForWeek: (weekOffset: number) => Promise<WeekResult>
+  getDayForOffset: (dayOffset: number) => Promise<DayResult>
   getNoteByDate: (noteDate: string) => Promise<Note | null>
   moveTaskToToday: (taskId: number) => Promise<Task>
   setNotePosition: (noteId: number, x: number, y: number) => Promise<void>
