@@ -1,5 +1,13 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
-import type { Note, BoardNote, Task, NewTask, TaskStatus, VaultStatus, DayResult } from '../shared/types'
+import type {
+  Note,
+  BoardNote,
+  Task,
+  NewTask,
+  TaskStatus,
+  VaultStatus,
+  DayResult
+} from '../shared/types'
 
 interface TodobeeApi {
   listTasks: (noteId: number) => Promise<Task[]>
@@ -14,10 +22,10 @@ interface TodobeeApi {
   createNote: (title: string, colour: string) => Promise<BoardNote>
   renameNote: (noteId: number, title: string) => Promise<Note>
   deleteNote: (noteId: number) => Promise<void>
+  /** Moves the post-it's unfinished tasks to tomorrow; resolves to how many moved. */
+  moveOpenTasksToNextDay: (noteId: number) => Promise<number>
   getVaultStatus: () => Promise<VaultStatus>
   chooseVaultFolder: () => Promise<VaultStatus | null>
-  /** Dev-only — only present when running `npm run dev`, absent in packaged builds. */
-  simulateNextDay?: () => Promise<void>
 }
 
 declare global {

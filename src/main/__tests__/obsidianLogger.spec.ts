@@ -2,12 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest'
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import {
-  formatTimestamp,
-  formatLogLine,
-  logFilePath,
-  appendTaskEvent
-} from '../obsidianLogger'
+import { formatTimestamp, formatLogLine, logFilePath, appendTaskEvent } from '../obsidianLogger'
 
 // Fixed instant: 2026-09-27T17:30:12.000Z is 19:30:12 in Europe/Brussels
 // (UTC+02:00, daylight saving in effect in September) — matches the exact
@@ -64,6 +59,23 @@ describe('formatLogLine', () => {
     )
     expect(line).toBe(
       '- **2026-09-27 19:30:12 (Europe/Brussels, UTC+02:00)** — `task.edited` — Status: open — "kerjain pr" — Note: "today\'s buzz" — moved from 2026-09-26'
+    )
+  })
+
+  it('appends a "moved to" note when a task is postponed to the next day', () => {
+    const line = formatLogLine(
+      {
+        type: 'task.edited',
+        status: 'open',
+        title: 'kerjain pr',
+        noteTitle: 'School',
+        movedTo: '2026-09-28'
+      },
+      FIXED_INSTANT,
+      'Europe/Brussels'
+    )
+    expect(line).toBe(
+      '- **2026-09-27 19:30:12 (Europe/Brussels, UTC+02:00)** — `task.edited` — Status: open — "kerjain pr" — Note: "School" — moved to 2026-09-28'
     )
   })
 })

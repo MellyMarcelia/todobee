@@ -60,30 +60,40 @@ async function loadNote(): Promise<void> {
 
 onMounted(loadNote)
 
-// Dev-only "simulate next day" (Milestone 4). window.api.simulateNextDay is
-// only defined when running `npm run dev` (see preload/index.ts), so this
-// button and its handler simply don't exist in a packaged build. Only shown
-// on an editable (today's) post-it — simulating from a past note's screen
-// would be confusing since it changes the whole app's notion of "today".
-// Milestone 8b: advancing the day can change which post-its exist (today's
-// post-its may get sealed, new ones created), so instead of trying to
-// guess which post-it to show next, just head back to the board and let it
-// reload the new day.
 const isDev = import.meta.env.DEV
-const isSimulatingNextDay = ref(false)
 
-async function simulateNextDay(): Promise<void> {
-  if (!window.api.simulateNextDay || isSimulatingNextDay.value) return
-  isSimulatingNextDay.value = true
-  loadError.value = null
+// "Move this to the next day": postpones this post-it's unfinished tasks to
+// the matching post-it on tomorrow. It does *not* end today — this post-it
+// stays open and colourful with its finished tasks until the day is really
+// over (rollover then seals it). Only offered while there's something
+// unfinished to move.
+const hasOpenTasks = computed(() => tasks.value.some((t) => t.status === 'open'))
+const isMovingToNextDay = ref(false)
+const movedMessage = ref<string | null>(null)
+let movedMessageTimeout: ReturnType<typeof setTimeout> | undefined
+// Moving the open tasks away can leave only done ones behind, which counts
+// as "all done" — but postponing isn't finishing, so skip the celebration.
+let skipNextCelebration = false
+
+async function moveOpenTasksToNextDay(): Promise<void> {
+  if (!note.value || isMovingToNextDay.value) return
+  isMovingToNextDay.value = true
   try {
-    await window.api.simulateNextDay()
-    emit('back')
+    const movedCount = await window.api.moveOpenTasksToNextDay(note.value.id)
+    skipNextCelebration = true
+    tasks.value = await window.api.listTasks(note.value.id)
+    await nextTick()
+    skipNextCelebration = false
+    movedMessage.value = `${movedCount} task${movedCount === 1 ? '' : 's'} moved to tomorrow`
+    clearTimeout(movedMessageTimeout)
+    movedMessageTimeout = setTimeout(() => {
+      movedMessage.value = null
+    }, 2500)
   } catch (error) {
     loadError.value = error instanceof Error ? error.message : String(error)
-    console.error('Failed to simulate next day:', error)
+    console.error('Failed to move tasks to the next day:', error)
   } finally {
-    isSimulatingNextDay.value = false
+    isMovingToNextDay.value = false
   }
 }
 
@@ -201,7 +211,9 @@ async function confirmEditTitle(): Promise<void> {
 // least one task, and none of them are open) so the stamp always agrees
 // with what actually gets saved to the database — no separate source of
 // truth to drift out of sync.
-const isPerfectDay = computed(() => tasks.value.length > 0 && tasks.value.every((t) => t.status === 'done'))
+const isPerfectDay = computed(
+  () => tasks.value.length > 0 && tasks.value.every((t) => t.status === 'done')
+)
 
 // The celebration (bee bounce) should play once, right when the day
 // *becomes* perfect — not every time this component re-renders while it's
@@ -218,7 +230,7 @@ let celebrationTimeout: ReturnType<typeof setTimeout> | undefined
 let hasLoadedOnce = false
 
 watch(isPerfectDay, (nowPerfect, wasPerfect) => {
-  if (nowPerfect && !wasPerfect && hasLoadedOnce) {
+  if (nowPerfect && !wasPerfect && hasLoadedOnce && !skipNextCelebration) {
     isCelebrating.value = true
     celebrationKey.value += 1
     clearTimeout(celebrationTimeout)
@@ -276,7 +288,10 @@ watch(isPerfectDay, (nowPerfect, wasPerfect) => {
         <li v-for="task in tasks" :key="task.id" class="task-row">
           <button
             class="checkbox"
-            :class="{ done: task.status === 'done', 'checkbox-disabled': isReadOnly && task.status === 'open' }"
+            :class="{
+              done: task.status === 'done',
+              'checkbox-disabled': isReadOnly && task.status === 'open'
+            }"
             :aria-label="task.status === 'done' ? 'Mark as open' : 'Mark as done'"
             @click="onCheckboxClick(task)"
           >
@@ -339,16 +354,17 @@ watch(isPerfectDay, (nowPerfect, wasPerfect) => {
         <CheckIcon />
       </button>
 
-      <!-- dev-only: simulate next day, to test rollover without waiting -->
+      <!-- postpone this post-it's unfinished tasks to tomorrow (today stays open) -->
       <button
-        v-if="isDev && !isReadOnly"
-        class="dev-next-day-button"
-        :disabled="isSimulatingNextDay"
-        title="Dev only: simulate next day"
-        @click="simulateNextDay"
+        v-if="!isReadOnly && hasOpenTasks"
+        class="next-day-button"
+        :disabled="isMovingToNextDay"
+        title="Move the unfinished tasks on this post-it to tomorrow"
+        @click="moveOpenTasksToNextDay"
       >
-        {{ isSimulatingNextDay ? 'moving…' : 'move this to the next day →' }}
+        {{ isMovingToNextDay ? 'moving…' : 'move this to the next day →' }}
       </button>
+      <p v-if="movedMessage" class="moved-message">{{ movedMessage }}</p>
     </div>
 
     <!-- Milestone 8: one-shot bee celebration, played right when the last
@@ -452,7 +468,9 @@ watch(isPerfectDay, (nowPerfect, wasPerfect) => {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  transition: transform 0.32s ease-in, opacity 0.32s ease-in;
+  transition:
+    transform 0.32s ease-in,
+    opacity 0.32s ease-in;
 }
 
 .note-flying-back {
@@ -612,7 +630,7 @@ watch(isPerfectDay, (nowPerfect, wasPerfect) => {
   cursor: pointer;
 }
 
-.dev-next-day-button {
+.next-day-button {
   position: absolute;
   top: -16px;
   right: 10px;
@@ -632,19 +650,28 @@ watch(isPerfectDay, (nowPerfect, wasPerfect) => {
     box-shadow 0.12s ease;
 }
 
-.dev-next-day-button:hover:not(:disabled) {
+.next-day-button:hover:not(:disabled) {
   transform: rotate(2deg) translateY(-1px);
   box-shadow: 3px 4px 0 var(--color-ink);
 }
 
-.dev-next-day-button:active:not(:disabled) {
+.next-day-button:active:not(:disabled) {
   transform: rotate(2deg) translate(2px, 3px);
   box-shadow: 0 0 0 var(--color-ink);
 }
 
-.dev-next-day-button:disabled {
+.next-day-button:disabled {
   opacity: 0.7;
   cursor: default;
+}
+
+.moved-message {
+  position: absolute;
+  top: 16px;
+  right: 14px;
+  z-index: 15;
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
 }
 
 .move-confirm-overlay {

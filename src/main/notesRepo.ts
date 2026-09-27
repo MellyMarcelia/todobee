@@ -8,6 +8,7 @@
 // rather than "the note for a date" (singular).
 import type Database from 'better-sqlite3'
 import type { BoardNote, Note } from '../shared/types'
+import { recalculatePerfectDay } from './perfectDay'
 
 interface NoteRow {
   id: number
@@ -125,4 +126,59 @@ export function deleteNote(
     title: task.title,
     status: task.status === 'done' ? ('done' as const) : ('open' as const)
   }))
+}
+
+/**
+ * "Move this to the next day": moves a post-it's unfinished tasks onto the
+ * matching post-it (same title + colour) on `targetDate`, creating it —
+ * pinned in the same board spot — if that day doesn't have one yet.
+ *
+ * Unlike rollover, the source post-it is *not* sealed: its day isn't over,
+ * so it stays editable (with its finished tasks) until rollover seals it.
+ * When `targetDate` later becomes today, rollover finds the post-it already
+ * there and carries on from it.
+ *
+ * Returns the target post-it and the titles of the tasks that moved.
+ */
+export function moveOpenTasksToDate(
+  db: Database.Database,
+  noteId: number,
+  targetDate: string
+): { target: Note; movedTitles: string[] } {
+  const move = db.transaction(() => {
+    const source = db.prepare<[number], NoteRow>('SELECT * FROM notes WHERE id = ?').get(noteId)
+    if (!source) throw new Error(`No post-it found (id ${noteId}).`)
+
+    const existing = db
+      .prepare<[string, string, string], NoteRow>(
+        'SELECT * FROM notes WHERE note_date = ? AND title = ? AND colour = ? ORDER BY id ASC'
+      )
+      .get(targetDate, source.title, source.colour)
+    const targetId =
+      existing?.id ??
+      (db
+        .prepare(
+          'INSERT INTO notes (note_date, title, colour, board_x, board_y) VALUES (?, ?, ?, ?, ?)'
+        )
+        .run(targetDate, source.title, source.colour, source.board_x, source.board_y)
+        .lastInsertRowid as number)
+
+    const movedTitles = db
+      .prepare<[number], { title: string }>(
+        "SELECT title FROM tasks WHERE note_id = ? AND status = 'open' ORDER BY created_at ASC, id ASC"
+      )
+      .all(noteId)
+      .map((row) => row.title)
+    db.prepare("UPDATE tasks SET note_id = ? WHERE note_id = ? AND status = 'open'").run(
+      targetId,
+      noteId
+    )
+
+    recalculatePerfectDay(db, noteId)
+    recalculatePerfectDay(db, targetId)
+    return { targetId, movedTitles }
+  })
+
+  const { targetId, movedTitles } = move()
+  return { target: getNoteById(db, targetId)!, movedTitles }
 }

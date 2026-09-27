@@ -8,11 +8,7 @@ import { dirname, join } from 'path'
 
 /** The six task events this logger knows how to write a line for. */
 export type TaskEventType =
-  | 'task.created'
-  | 'task.edited'
-  | 'task.completed'
-  | 'task.reopened'
-  | 'task.deleted'
+  'task.created' | 'task.edited' | 'task.completed' | 'task.reopened' | 'task.deleted'
 
 export interface TaskEvent {
   type: TaskEventType
@@ -25,6 +21,12 @@ export interface TaskEvent {
    * onto today's note from an earlier note. Renders as "moved from YYYY-MM-DD".
    */
   movedFrom?: string
+  /**
+   * Set only when the user postpones a task with "move this to the next
+   * day": a task.edited event logged on the day it was moved away from.
+   * Renders as "moved to YYYY-MM-DD".
+   */
+  movedTo?: string
 }
 
 /** Pads a number to 2 digits, e.g. 7 -> "07". Used for both dates and times. */
@@ -71,7 +73,8 @@ function utcOffset(date: Date, timeZone: string): string {
     timeZone,
     timeZoneName: 'shortOffset'
   })
-  const tzPart = formatter.formatToParts(date).find((p) => p.type === 'timeZoneName')?.value ?? 'GMT+0'
+  const tzPart =
+    formatter.formatToParts(date).find((p) => p.type === 'timeZoneName')?.value ?? 'GMT+0'
   // tzPart looks like "GMT+2" or "GMT-4:30" — normalize to "+02:00" / "-04:30".
   const match = tzPart.match(/GMT([+-])(\d+)(?::(\d+))?/)
   if (!match) return '+00:00'
@@ -96,6 +99,7 @@ export function formatLogLine(event: TaskEvent, date: Date, timeZone: string): s
   const timestamp = formatTimestamp(date, timeZone)
   let line = `- **${timestamp}** — \`${event.type}\` — Status: ${event.status} — "${event.title}" — Note: "${event.noteTitle}"`
   if (event.movedFrom) line += ` — moved from ${event.movedFrom}`
+  if (event.movedTo) line += ` — moved to ${event.movedTo}`
   return line
 }
 

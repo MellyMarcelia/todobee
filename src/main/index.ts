@@ -13,7 +13,8 @@ import {
   createNote,
   updateNoteTitle,
   setNotePosition,
-  deleteNote
+  deleteNote,
+  moveOpenTasksToDate
 } from './notesRepo'
 import { recalculatePerfectDay } from './perfectDay'
 import { parseDateString, addDays, formatDateString, formatLongDate } from './dateUtils'
@@ -239,6 +240,29 @@ app.whenReady().then(() => {
         noteTitle: note.title
       })
     }
+  })
+
+  // "Move this to the next day" on an open post-it: postpones its
+  // unfinished tasks to the matching post-it on tomorrow, without ending
+  // today — the post-it stays editable (and colourful) until rollover seals
+  // it when the day is actually over. Logged in today's file as one
+  // task.edited "moved to <tomorrow>" line per task.
+  ipcMain.handle('notes:moveOpenTasksToNextDay', (_event, noteId: number) => {
+    const note = getNoteById(getDb(), noteId)
+    if (!note) throw new Error(`No post-it found (id ${noteId}).`)
+    if (note.sealed) throw new Error(`"${note.title}" is read-only history.`)
+    const tomorrow = formatDateString(addDays(parseDateString(todayDateString()), 1))
+    const { movedTitles } = moveOpenTasksToDate(getDb(), noteId, tomorrow)
+    for (const title of movedTitles) {
+      logTaskEvent({
+        type: 'task.edited',
+        status: 'open',
+        title,
+        noteTitle: note.title,
+        movedTo: tomorrow
+      })
+    }
+    return movedTitles.length
   })
 
   // Reopening a done task on a past (read-only) note, after the user

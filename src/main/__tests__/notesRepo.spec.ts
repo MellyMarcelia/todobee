@@ -7,8 +7,10 @@ import {
   createNote,
   updateNoteTitle,
   setNotePosition,
-  deleteNote
+  deleteNote,
+  moveOpenTasksToDate
 } from '../notesRepo'
+import { runLaunchRollover } from '../rollover'
 
 function makeDb(): Database.Database {
   const db = new Database(':memory:')
@@ -57,7 +59,7 @@ describe('listNotesForDate', () => {
     expect(listNotesForDate(db, '2026-09-28')).toEqual([])
   })
 
-  it('includes each note\'s task count', () => {
+  it("includes each note's task count", () => {
     const noteId = insertNote(db, '2026-09-28', 'School', '#4A90D9')
     insertTask(db, noteId, 'open')
     insertTask(db, noteId, 'done')
@@ -182,7 +184,9 @@ describe('deleteNote', () => {
     deleteNote(db, noteId)
 
     expect(getNoteById(db, noteId)).toBeNull()
-    const remaining = db.prepare('SELECT COUNT(*) AS n FROM tasks WHERE note_id = ?').get(noteId) as {
+    const remaining = db
+      .prepare('SELECT COUNT(*) AS n FROM tasks WHERE note_id = ?')
+      .get(noteId) as {
       n: number
     }
     expect(remaining.n).toBe(0)
@@ -209,5 +213,87 @@ describe('deleteNote', () => {
     const notes = listNotesForDate(db, '2026-09-28')
     expect(notes.map((note) => note.id)).toEqual([keptId])
     expect(notes[0].taskCount).toBe(1)
+  })
+})
+
+describe('moveOpenTasksToDate', () => {
+  let db: Database.Database
+
+  function tasksOn(noteId: number): { title: string; status: string }[] {
+    return db
+      .prepare('SELECT title, status FROM tasks WHERE note_id = ? ORDER BY id ASC')
+      .all(noteId) as { title: string; status: string }[]
+  }
+
+  function insertNamedTask(noteId: number, title: string, status: 'open' | 'done'): void {
+    db.prepare('INSERT INTO tasks (note_id, title, status) VALUES (?, ?, ?)').run(
+      noteId,
+      title,
+      status
+    )
+  }
+
+  beforeEach(() => {
+    db = makeDb()
+  })
+
+  it('moves only the unfinished tasks onto a matching post-it on the target date', () => {
+    const today = insertNote(db, '2026-09-28', 'School', '#7FB069')
+    insertNamedTask(today, 'Finished', 'done')
+    insertNamedTask(today, 'Unfinished', 'open')
+
+    const { target, movedTitles } = moveOpenTasksToDate(db, today, '2026-09-29')
+
+    expect(movedTitles).toEqual(['Unfinished'])
+    expect(target.noteDate).toBe('2026-09-29')
+    expect(target.title).toBe('School')
+    expect(target.colour).toBe('#7FB069')
+    expect(tasksOn(target.id)).toEqual([{ title: 'Unfinished', status: 'open' }])
+    expect(tasksOn(today)).toEqual([{ title: 'Finished', status: 'done' }])
+  })
+
+  it('keeps the source post-it open and editable (not sealed)', () => {
+    const today = insertNote(db, '2026-09-28')
+    insertNamedTask(today, 'Unfinished', 'open')
+
+    moveOpenTasksToDate(db, today, '2026-09-29')
+
+    expect(getNoteById(db, today)?.sealed).toBe(false)
+  })
+
+  it('reuses the matching post-it when moving more tasks later the same day', () => {
+    const today = insertNote(db, '2026-09-28')
+    insertNamedTask(today, 'First', 'open')
+    const first = moveOpenTasksToDate(db, today, '2026-09-29')
+    insertNamedTask(today, 'Second', 'open')
+    const second = moveOpenTasksToDate(db, today, '2026-09-29')
+
+    expect(second.target.id).toBe(first.target.id)
+    expect(listNotesForDate(db, '2026-09-29')).toHaveLength(1)
+    expect(tasksOn(first.target.id).map((t) => t.title)).toEqual(['First', 'Second'])
+  })
+
+  it('pins the new post-it where the original is on the board', () => {
+    const today = insertNote(db, '2026-09-28')
+    setNotePosition(db, today, 44, 65)
+    insertNamedTask(today, 'Unfinished', 'open')
+
+    const { target } = moveOpenTasksToDate(db, today, '2026-09-29')
+
+    expect(target.boardX).toBe(44)
+    expect(target.boardY).toBe(65)
+  })
+
+  it('is picked up by rollover when the next day arrives, without duplicating it', () => {
+    const today = insertNote(db, '2026-09-28', 'School', '#7FB069')
+    insertNamedTask(today, 'Finished', 'done')
+    insertNamedTask(today, 'Postponed', 'open')
+    const { target } = moveOpenTasksToDate(db, today, '2026-09-29')
+
+    const result = runLaunchRollover(db, '2026-09-29')
+
+    expect(result.notes.map((n) => n.id)).toEqual([target.id])
+    expect(tasksOn(target.id)).toEqual([{ title: 'Postponed', status: 'open' }])
+    expect(getNoteById(db, today)?.sealed).toBe(true)
   })
 })

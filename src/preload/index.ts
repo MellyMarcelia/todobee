@@ -19,7 +19,8 @@ const api = {
   // History board (Milestone 7, revised) + multiple post-its per day (Milestone 8b).
   getDayForOffset: (dayOffset: number): Promise<DayResult> =>
     ipcRenderer.invoke('notes:getForDay', dayOffset),
-  getNoteById: (noteId: number): Promise<Note | null> => ipcRenderer.invoke('notes:getById', noteId),
+  getNoteById: (noteId: number): Promise<Note | null> =>
+    ipcRenderer.invoke('notes:getById', noteId),
   setNotePosition: (noteId: number, x: number, y: number): Promise<void> =>
     ipcRenderer.invoke('notes:setPosition', noteId, x, y),
   createNote: (title: string, colour: string): Promise<BoardNote> =>
@@ -27,15 +28,12 @@ const api = {
   renameNote: (noteId: number, title: string): Promise<Note> =>
     ipcRenderer.invoke('notes:rename', noteId, title),
   deleteNote: (noteId: number): Promise<void> => ipcRenderer.invoke('notes:delete', noteId),
+  moveOpenTasksToNextDay: (noteId: number): Promise<number> =>
+    ipcRenderer.invoke('notes:moveOpenTasksToNextDay', noteId),
 
   // Settings / Obsidian vault folder (Milestone 5).
   getVaultStatus: (): Promise<VaultStatus> => ipcRenderer.invoke('vault:getStatus'),
-  chooseVaultFolder: (): Promise<VaultStatus | null> => ipcRenderer.invoke('vault:chooseFolder'),
-
-  // Dev-only: only exists while running `npm run dev`, see main/index.ts.
-  ...(process.env['ELECTRON_RENDERER_URL']
-    ? { simulateNextDay: (): Promise<void> => ipcRenderer.invoke('dev:simulateNextDay') }
-    : {})
+  chooseVaultFolder: (): Promise<VaultStatus | null> => ipcRenderer.invoke('vault:chooseFolder')
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to
