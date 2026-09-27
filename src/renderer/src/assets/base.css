@@ -1,0 +1,64 @@
+:root {
+  /* --- Todobee design tokens (see PRD hand-drawn concept sketches) --- */
+
+  /* Backgrounds */
+  --color-cream: #fdf3dc; /* app background */
+  --color-board: #c98f6b; /* corkboard / board panel */
+  --color-board-border: #a66e4e;
+
+  /* Sticky note */
+  --color-note: #f6c56a;
+  --color-note-border: #b7862f;
+  --radius-board: 18px;
+  --radius-note: 20px;
+
+  /* Ink / outlines — flat illustration style, no gradients or drop shadows */
+  --color-ink: #2b2622;
+  --outline-width: 3px;
+  --outline-width-thick: 4px;
+
+  /* Text */
+  --color-text: #3a2a1a;
+  --color-text-muted: #8c7355; /* done / muted task text, shown with strikethrough */
+
+  /* Accents */
+  --color-check-green: #5e9b3c;
+  --color-check-tick: #ffffff;
+  --color-honey: #e9a23b;
+
+  /* Fonts */
+  --font-heading: 'Sniglet', 'Comic Sans MS', sans-serif;
+  --font-body: 'Nunito', 'Segoe UI', sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  font-weight: normal;
+}
+
+ul {
+  list-style: none;
+}
+
+body {
+  min-height: 100vh;
+  color: var(--color-text);
+  background: var(--color-cream);
+  line-height: 1.5;
+  font-family: var(--font-body);
+  font-weight: 700;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  color: var(--color-text);
+}
