@@ -32,8 +32,11 @@ function startAddingTask(): void {
 }
 
 async function confirmAddTask(): Promise<void> {
-  const title = newTaskTitle.value.trim()
+  if (!isAddingTask.value) return // already confirmed (e.g. by the Enter keyup); ignore the blur that follows
   isAddingTask.value = false
+
+  const title = newTaskTitle.value.trim()
+  newTaskTitle.value = ''
   if (!title || !note.value) return
 
   const created = await window.api.createTask(note.value.id, { title })
@@ -53,8 +56,10 @@ function startEditingTask(task: Task): void {
 }
 
 async function confirmEditTask(task: Task): Promise<void> {
-  const title = editingTitle.value.trim()
+  if (editingTaskId.value !== task.id) return // already confirmed; ignore the blur that follows
   editingTaskId.value = null
+
+  const title = editingTitle.value.trim()
   if (!title || title === task.title) return
 
   const updated = await window.api.updateTaskTitle(task.id, title)
@@ -128,15 +133,6 @@ async function removeTask(task: Task): Promise<void> {
           <span v-else class="task-text muted" @click="startAddingTask">tap to add…</span>
         </li>
       </ul>
-
-      <!-- decorative honey dipper + pencil, bottom-right -->
-      <svg viewBox="0 0 80 60" class="decoration" xmlns="http://www.w3.org/2000/svg">
-        <line x1="10" y1="50" x2="24" y2="20" class="pencil-deco" />
-        <path
-          d="M50 14 q10 -6 14 4 q3 8 -6 12 q6 4 2 12 q-4 8 -12 2 q-6 4 -8 -4"
-          class="dipper-deco"
-        />
-      </svg>
 
       <!-- help button, bottom-left -->
       <button class="help-button" aria-label="Help">?</button>
@@ -289,28 +285,6 @@ async function removeTask(task: Task): Promise<void> {
 
 .add-row {
   opacity: 0.7;
-}
-
-.decoration {
-  position: absolute;
-  bottom: 60px;
-  right: 8px;
-  width: 70px;
-  height: 52px;
-  pointer-events: none;
-}
-
-.pencil-deco {
-  stroke: var(--color-honey);
-  stroke-width: 5;
-  stroke-linecap: round;
-}
-
-.dipper-deco {
-  fill: none;
-  stroke: var(--color-ink);
-  stroke-width: 3;
-  stroke-linecap: round;
 }
 
 .help-button {
