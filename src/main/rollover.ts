@@ -25,20 +25,29 @@ function toNote(row: NoteRow): Note {
   }
 }
 
+interface TaskTitleRow {
+  title: string
+}
+
+/** A note, plus which tasks (if any) were just moved onto it from a previous note. */
+export interface RolloverResult extends Note {
+  movedTasks: { title: string; fromDate: string }[]
+}
+
 /**
  * Ensures today's note exists, rolling over unfinished tasks from the
  * previous note the first time this runs on a new day. Safe to call more
  * than once on the same day — if today's note already exists, it's returned
  * as-is and nothing is moved or sealed again.
  */
-export function runLaunchRollover(db: Database.Database, todayDate: string): Note {
+export function runLaunchRollover(db: Database.Database, todayDate: string): RolloverResult {
   const existingToday = db
     .prepare<[string], NoteRow>('SELECT * FROM notes WHERE note_date = ?')
     .get(todayDate)
 
-  if (existingToday) return toNote(existingToday)
+  if (existingToday) return { ...toNote(existingToday), movedTasks: [] }
 
-  const rollover = db.transaction((): NoteRow => {
+  const rollover = db.transaction((): { note: NoteRow; movedTasks: { title: string; fromDate: string }[] } => {
     // The previous note is the most recent unsealed note. In normal use
     // there's at most one unsealed note at a time (today's, until it rolls
     // over), so this also self-heals if rollover was ever skipped for a day.
@@ -54,7 +63,16 @@ export function runLaunchRollover(db: Database.Database, todayDate: string): Not
     const insertResult = db.prepare('INSERT INTO notes (note_date) VALUES (?)').run(todayDate)
     const todayId = insertResult.lastInsertRowid as number
 
+    let movedTasks: { title: string; fromDate: string }[] = []
+
     if (previous) {
+      const unfinished = db
+        .prepare<[number, string], TaskTitleRow>(
+          'SELECT title FROM tasks WHERE note_id = ? AND status = ?'
+        )
+        .all(previous.id, 'open')
+      movedTasks = unfinished.map((row) => ({ title: row.title, fromDate: previous.note_date }))
+
       db.prepare('UPDATE tasks SET note_id = ? WHERE note_id = ? AND status = ?').run(
         todayId,
         previous.id,
@@ -63,8 +81,10 @@ export function runLaunchRollover(db: Database.Database, todayDate: string): Not
       db.prepare('UPDATE notes SET sealed = 1 WHERE id = ?').run(previous.id)
     }
 
-    return db.prepare<[number], NoteRow>('SELECT * FROM notes WHERE id = ?').get(todayId)!
+    const note = db.prepare<[number], NoteRow>('SELECT * FROM notes WHERE id = ?').get(todayId)!
+    return { note, movedTasks }
   })
 
-  return toNote(rollover())
+  const { note, movedTasks } = rollover()
+  return { ...toNote(note), movedTasks }
 }

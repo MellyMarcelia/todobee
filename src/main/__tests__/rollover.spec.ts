@@ -108,4 +108,22 @@ describe('runLaunchRollover', () => {
     }
     expect(reloaded.sealed).toBe(0)
   })
+
+  it('reports which tasks moved and from which note date, for logging', () => {
+    const yesterday = runLaunchRollover(db, '2026-09-27')
+    insertTask(db, yesterday.id, 'Finished task', 'done')
+    insertTask(db, yesterday.id, 'Unfinished task', 'open')
+
+    const today = runLaunchRollover(db, '2026-09-28')
+
+    expect(today.movedTasks).toEqual([{ title: 'Unfinished task', fromDate: '2026-09-27' }])
+  })
+
+  it('reports no moved tasks on the very first launch ever, or on a same-day relaunch', () => {
+    const first = runLaunchRollover(db, '2026-09-28')
+    expect(first.movedTasks).toEqual([])
+
+    const relaunch = runLaunchRollover(db, '2026-09-28')
+    expect(relaunch.movedTasks).toEqual([])
+  })
 })

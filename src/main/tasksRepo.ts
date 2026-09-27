@@ -32,6 +32,12 @@ export function listTasksForNote(noteId: number): Task[] {
   return rows.map(toTask)
 }
 
+export function getTaskById(taskId: number): Task | null {
+  const db = getDb()
+  const row = db.prepare<[number], TaskRow>('SELECT * FROM tasks WHERE id = ?').get(taskId)
+  return row ? toTask(row) : null
+}
+
 export function createTask(noteId: number, input: NewTask): Task {
   const db = getDb()
   const result = db

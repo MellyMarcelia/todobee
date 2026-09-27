@@ -5,8 +5,10 @@ import icon from '../../resources/icon.png?asset'
 import { getDb } from './db'
 import { runLaunchRollover } from './rollover'
 import { getVaultStatus, setVaultPath } from './settingsRepo'
+import { appendTaskEvent } from './obsidianLogger'
 import {
   listTasksForNote,
+  getTaskById,
   createTask,
   updateTaskTitle,
   setTaskStatus,
@@ -36,6 +38,25 @@ function currentAppDateString(): string {
   const month = String(shifted.getMonth() + 1).padStart(2, '0')
   const day = String(shifted.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
+}
+
+/**
+ * Runs rollover for the given date and logs one task.edited "moved from"
+ * line per task that got carried over — shared by the real launch handler
+ * and the dev-only "simulate next day" handler so they can't drift apart.
+ */
+function rolloverAndLog(dateString: string): ReturnType<typeof runLaunchRollover> {
+  const result = runLaunchRollover(getDb(), dateString)
+  const vaultPath = getVaultStatus(getDb()).path
+  for (const moved of result.movedTasks) {
+    appendTaskEvent(vaultPath, {
+      type: 'task.edited',
+      status: 'open',
+      title: moved.title,
+      movedFrom: moved.fromDate
+    })
+  }
+  return result
 }
 
 function createWindow(): void {
@@ -90,19 +111,50 @@ app.whenReady().then(() => {
 
   // Today's note + task CRUD (Milestone 2, extended with rollover in
   // Milestone 4). Each handler is a thin wrapper around tasksRepo/rollover —
-  // the actual SQL lives there, this just wires it to IPC.
-  ipcMain.handle('todayNote:get', () => runLaunchRollover(getDb(), currentAppDateString()))
+  // the actual SQL lives there, this just wires it to IPC. Milestone 6 adds
+  // one appendTaskEvent call per event, right after the SQL succeeds, using
+  // the current saved vault path — logging failures never throw (see
+  // obsidianLogger.ts), so a bad/missing vault can't break task management.
+  ipcMain.handle('todayNote:get', () => rolloverAndLog(currentAppDateString()))
   ipcMain.handle('tasks:list', (_event, noteId: number) => listTasksForNote(noteId))
-  ipcMain.handle('tasks:create', (_event, noteId: number, input: NewTask) =>
-    createTask(noteId, input)
-  )
-  ipcMain.handle('tasks:updateTitle', (_event, taskId: number, title: string) =>
-    updateTaskTitle(taskId, title)
-  )
-  ipcMain.handle('tasks:setStatus', (_event, taskId: number, status: 'open' | 'done') =>
-    setTaskStatus(taskId, status)
-  )
-  ipcMain.handle('tasks:delete', (_event, taskId: number) => deleteTask(taskId))
+  ipcMain.handle('tasks:create', (_event, noteId: number, input: NewTask) => {
+    const created = createTask(noteId, input)
+    appendTaskEvent(getVaultStatus(getDb()).path, {
+      type: 'task.created',
+      status: created.status,
+      title: created.title
+    })
+    return created
+  })
+  ipcMain.handle('tasks:updateTitle', (_event, taskId: number, title: string) => {
+    const updated = updateTaskTitle(taskId, title)
+    appendTaskEvent(getVaultStatus(getDb()).path, {
+      type: 'task.edited',
+      status: updated.status,
+      title: updated.title
+    })
+    return updated
+  })
+  ipcMain.handle('tasks:setStatus', (_event, taskId: number, status: 'open' | 'done') => {
+    const updated = setTaskStatus(taskId, status)
+    appendTaskEvent(getVaultStatus(getDb()).path, {
+      type: status === 'done' ? 'task.completed' : 'task.reopened',
+      status: updated.status,
+      title: updated.title
+    })
+    return updated
+  })
+  ipcMain.handle('tasks:delete', (_event, taskId: number) => {
+    const task = getTaskById(taskId)
+    deleteTask(taskId)
+    if (task) {
+      appendTaskEvent(getVaultStatus(getDb()).path, {
+        type: 'task.deleted',
+        status: task.status,
+        title: task.title
+      })
+    }
+  })
 
   // Milestone 5: Settings + vault folder picker. getStatus returns both the
   // saved path and whether it currently exists on disk (the folder could
@@ -127,7 +179,7 @@ app.whenReady().then(() => {
   if (is.dev) {
     ipcMain.handle('dev:simulateNextDay', () => {
       devDateOffsetDays += 1
-      return runLaunchRollover(getDb(), currentAppDateString())
+      return rolloverAndLog(currentAppDateString())
     })
   }
 
