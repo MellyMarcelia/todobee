@@ -6,6 +6,7 @@
 // imports), which is what makes it testable with an in-memory database.
 import type Database from 'better-sqlite3'
 import type { Note } from '../shared/types'
+import { recalculatePerfectDay } from './perfectDay'
 
 interface NoteRow {
   id: number
@@ -83,6 +84,11 @@ export function runLaunchRollover(db: Database.Database, todayDate: string): Rol
         'open'
       )
       db.prepare('UPDATE notes SET sealed = 1 WHERE id = ?').run(previous.id)
+      // Only remaining tasks on the sealed note are done ones (unfinished
+      // ones just moved away), so it's now perfect exactly when it isn't
+      // empty — recalculate rather than assume, to stay consistent with
+      // every other perfect_day update path.
+      recalculatePerfectDay(db, previous.id)
     }
 
     const note = db.prepare<[number], NoteRow>('SELECT * FROM notes WHERE id = ?').get(todayId)!

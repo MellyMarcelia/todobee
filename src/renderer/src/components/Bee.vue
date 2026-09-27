@@ -1,12 +1,12 @@
 <script setup lang="ts">
-// Bee mascot. Wraps a hand-made GIF asset (not drawn by us) so mood/size can
-// be swapped from one place. Only "idle" exists for now — Milestone 8 adds
-// "happy" (celebration), and Beemodoro reuses this component for its own
-// bee states later.
+// Bee mascot. Wraps hand-made GIF assets (not drawn by us) so mood/size can
+// be swapped from one place. "happy" is the Milestone 8 celebration mood
+// (all tasks done for the day) — falls back to a bounce/wiggle CSS
+// animation on the idle art if no bee-happy.gif asset exists yet.
 import { computed } from 'vue'
 import beeIdle from '../assets/bee/bee-idle.gif'
 
-type Mood = 'idle'
+type Mood = 'idle' | 'happy'
 
 const props = withDefaults(
   defineProps<{
@@ -23,8 +23,13 @@ const props = withDefaults(
   }
 )
 
+// No bee-happy.gif asset exists yet, so "happy" reuses the idle art and
+// gets its celebration from a CSS bounce/wiggle animation instead (see
+// .bee-happy below). Swap this back to a dedicated asset once one exists —
+// nothing else needs to change, moodAssets is the only place that knows.
 const moodAssets: Record<Mood, string> = {
-  idle: beeIdle
+  idle: beeIdle,
+  happy: beeIdle
 }
 
 // bee-idle.gif is a 500x500 canvas, but the drawn bee doesn't fill it — there
@@ -57,7 +62,7 @@ const backgroundPosition = computed(() => {
 <template>
   <div
     class="bee-mascot"
-    :class="{ 'bee-bob': bob }"
+    :class="{ 'bee-bob': bob, 'bee-happy': mood === 'happy' }"
     role="img"
     :aria-label="`Bee mascot (${mood})`"
     :style="{
@@ -80,6 +85,15 @@ const backgroundPosition = computed(() => {
   .bee-bob {
     animation: bee-typing-bob 0.6s ease-in-out infinite;
   }
+
+  /* One-shot celebration wiggle/bounce, played once when this component
+     mounts with mood="happy" (the parent forces a remount with :key to
+     replay it — see TodayScreen.vue). Ends back at rest (scale/rotate 0)
+     via animation-fill-mode so the bee doesn't snap after the animation. */
+  .bee-happy {
+    animation: bee-celebrate 0.8s ease-in-out 1;
+    animation-fill-mode: forwards;
+  }
 }
 
 @keyframes bee-typing-bob {
@@ -89,6 +103,27 @@ const backgroundPosition = computed(() => {
   }
   50% {
     transform: translateY(-3px);
+  }
+}
+
+@keyframes bee-celebrate {
+  0% {
+    transform: translateY(0) rotate(0deg) scale(1);
+  }
+  20% {
+    transform: translateY(-14px) rotate(-8deg) scale(1.08);
+  }
+  40% {
+    transform: translateY(0) rotate(6deg) scale(1);
+  }
+  60% {
+    transform: translateY(-8px) rotate(-4deg) scale(1.04);
+  }
+  80% {
+    transform: translateY(0) rotate(2deg) scale(1);
+  }
+  100% {
+    transform: translateY(0) rotate(0deg) scale(1);
   }
 }
 </style>

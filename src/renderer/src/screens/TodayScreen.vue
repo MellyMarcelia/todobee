@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import CheckIcon from '../components/icons/CheckIcon.vue'
+import Bee from '../components/Bee.vue'
+import goodJobStamp from '../assets/stamps/good-job-stamp.png'
 import type { Note, Task } from '../../../shared/types'
 
 // When noteDate is omitted, this screen shows/edits *today's* note (runs
@@ -34,6 +36,7 @@ const vFocus = { mounted: (el: HTMLElement) => el.focus() }
 
 async function loadNote(): Promise<void> {
   loadError.value = null
+  hasLoadedOnce = false
   try {
     const loaded = props.noteDate
       ? await window.api.getNoteByDate(props.noteDate)
@@ -44,6 +47,12 @@ async function loadNote(): Promise<void> {
     }
     note.value = loaded
     tasks.value = await window.api.listTasks(loaded.id)
+    // Wait a tick so the isPerfectDay watcher below sees this initial
+    // (possibly already-perfect) state pass through before we start
+    // treating changes as "just finished" — otherwise loading an
+    // already-perfect note would immediately trigger the celebration.
+    await nextTick()
+    hasLoadedOnce = true
   } catch (error) {
     // Without this, a failed IPC call left `note` as null forever and the
     // whole post-it silently vanished with no visible error at all.
@@ -172,6 +181,38 @@ const noteTitle = computed(() => {
   const monthName = new Date(2000, month - 1, 1).toLocaleString('en-US', { month: 'short' })
   return `${monthName} ${day}`
 })
+
+// Milestone 8: "perfect day" stamp + bee celebration. isPerfectDay is
+// computed the exact same way the main process derives perfect_day (has at
+// least one task, and none of them are open) so the stamp always agrees
+// with what actually gets saved to the database — no separate source of
+// truth to drift out of sync.
+const isPerfectDay = computed(() => tasks.value.length > 0 && tasks.value.every((t) => t.status === 'done'))
+
+// The celebration (bee bounce) should play once, right when the day
+// *becomes* perfect — not every time this component re-renders while it's
+// already stamped, and not when a past (read-only) note happens to load
+// already-perfect. isCelebrating + celebrationKey together give the Bee a
+// fresh :key each time so its one-shot CSS animation actually replays.
+const isCelebrating = ref(false)
+const celebrationKey = ref(0)
+let celebrationTimeout: ReturnType<typeof setTimeout> | undefined
+// Guards against celebrating on the initial load of an already-perfect note
+// (e.g. reopening the app on a day you'd already finished, or viewing a
+// perfect day in history) — only a change that happens *after* the note has
+// finished its first load counts as "you just finished the last task".
+let hasLoadedOnce = false
+
+watch(isPerfectDay, (nowPerfect, wasPerfect) => {
+  if (nowPerfect && !wasPerfect && hasLoadedOnce) {
+    isCelebrating.value = true
+    celebrationKey.value += 1
+    clearTimeout(celebrationTimeout)
+    celebrationTimeout = setTimeout(() => {
+      isCelebrating.value = false
+    }, 900)
+  }
+})
 </script>
 
 <template>
@@ -192,6 +233,11 @@ const noteTitle = computed(() => {
       <h1 class="note-title">{{ noteTitle }}</h1>
       <p v-if="isReadOnly" class="note-readonly-badge">read-only history</p>
       <p v-if="isDev" class="note-date-debug">{{ note.noteDate }}</p>
+
+      <!-- Milestone 8: "Good job" stamp, shown once every task is done.
+           Reopening a task or adding a new one removes perfect_day on the
+           main process side, which flows back here via isPerfectDay. -->
+      <img v-if="isPerfectDay" :src="goodJobStamp" alt="Good job stamp" class="good-job-stamp" />
 
       <ul class="task-list">
         <li v-for="task in tasks" :key="task.id" class="task-row">
@@ -248,9 +294,6 @@ const noteTitle = computed(() => {
         </li>
       </ul>
 
-      <!-- help button, bottom-left -->
-      <button class="help-button" aria-label="Help">?</button>
-
       <!-- folded-corner "done for now": pins the note back to the board
            without finishing or deleting anything. Only on today's own note. -->
       <button
@@ -273,6 +316,14 @@ const noteTitle = computed(() => {
       >
         {{ isSimulatingNextDay ? '…' : '⏭ next day' }}
       </button>
+    </div>
+
+    <!-- Milestone 8: one-shot bee celebration, played right when the last
+         task gets ticked. :key forces a remount so the CSS animation always
+         replays, even if the day is finished more than once in a session
+         (e.g. reopen a task then finish it again). -->
+    <div v-if="isCelebrating" class="celebration-bee">
+      <Bee :key="celebrationKey" :size="90" mood="happy" />
     </div>
 
     <div v-if="taskPendingMove" class="move-confirm-overlay">
@@ -496,21 +547,6 @@ const noteTitle = computed(() => {
   opacity: 0.7;
 }
 
-.help-button {
-  position: absolute;
-  bottom: 14px;
-  left: 14px;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  border: var(--outline-width) solid var(--color-ink);
-  background: #fff8ea;
-  color: var(--color-text);
-  font-family: var(--font-heading);
-  font-weight: 800;
-  cursor: pointer;
-}
-
 .fold-corner {
   position: absolute;
   bottom: 0;
@@ -591,5 +627,33 @@ const noteTitle = computed(() => {
 .move-confirm-no {
   background: transparent;
   color: var(--color-text);
+}
+
+/* Milestone 8: "Good job" stamp. Pressed across almost the whole note,
+   tilted like a rubber stamp that's been pressed slightly off-angle. It's an
+   overlay (absolutely positioned, no pointer events) so the tasks underneath
+   stay readable and clickable through the transparent PNG. */
+.good-job-stamp {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 70%;
+  max-height: 70%;
+  object-fit: contain;
+  transform: translate(-50%, -50%) rotate(-8deg);
+  opacity: 0.85;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Bee celebration overlay — floats above the note, centered, so the bounce
+   animation has room to move without shifting any layout underneath it. */
+.celebration-bee {
+  position: absolute;
+  top: 18%;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
 }
 </style>

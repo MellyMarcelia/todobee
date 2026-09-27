@@ -7,6 +7,7 @@ import { runLaunchRollover } from './rollover'
 import { getVaultStatus, setVaultPath } from './settingsRepo'
 import { appendTaskEvent } from './obsidianLogger'
 import { listNotesForWeek, getNoteByDate, setNotePosition } from './notesRepo'
+import { recalculatePerfectDay } from './perfectDay'
 import { formatDateString, parseDateString, addDays, mondayOf, formatShortDate } from './dateUtils'
 import {
   listTasksForNote,
@@ -122,6 +123,7 @@ app.whenReady().then(() => {
   ipcMain.handle('tasks:list', (_event, noteId: number) => listTasksForNote(noteId))
   ipcMain.handle('tasks:create', (_event, noteId: number, input: NewTask) => {
     const created = createTask(noteId, input)
+    recalculatePerfectDay(getDb(), noteId)
     appendTaskEvent(getVaultStatus(getDb()).path, {
       type: 'task.created',
       status: created.status,
@@ -140,6 +142,7 @@ app.whenReady().then(() => {
   })
   ipcMain.handle('tasks:setStatus', (_event, taskId: number, status: 'open' | 'done') => {
     const updated = setTaskStatus(taskId, status)
+    recalculatePerfectDay(getDb(), updated.noteId)
     appendTaskEvent(getVaultStatus(getDb()).path, {
       type: status === 'done' ? 'task.completed' : 'task.reopened',
       status: updated.status,
@@ -151,6 +154,7 @@ app.whenReady().then(() => {
     const task = getTaskById(taskId)
     deleteTask(taskId)
     if (task) {
+      recalculatePerfectDay(getDb(), task.noteId)
       appendTaskEvent(getVaultStatus(getDb()).path, {
         type: 'task.deleted',
         status: task.status,
@@ -186,8 +190,11 @@ app.whenReady().then(() => {
   // reopening a task in place, since from the log's point of view the task
   // just became open again (its new note is implied by today's date).
   ipcMain.handle('tasks:moveToToday', (_event, taskId: number) => {
+    const sourceTask = getTaskById(taskId)
     const today = rolloverAndLog(currentAppDateString())
     const moved = moveTaskToNote(taskId, today.id)
+    if (sourceTask) recalculatePerfectDay(getDb(), sourceTask.noteId)
+    recalculatePerfectDay(getDb(), today.id)
     appendTaskEvent(getVaultStatus(getDb()).path, {
       type: 'task.reopened',
       status: moved.status,
