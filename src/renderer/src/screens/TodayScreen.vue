@@ -247,7 +247,10 @@ watch(isPerfectDay, (nowPerfect, wasPerfect) => {
       v-else-if="note"
       class="note"
       :class="{ 'note-flying-back': isFlyingBack }"
-      :style="{ background: note.colour, borderColor: 'var(--color-note-border)' }"
+      :style="{
+        background: isReadOnly ? 'var(--color-note-past)' : note.colour,
+        borderColor: 'var(--color-note-border)'
+      }"
     >
       <input
         v-if="isEditingTitle"
@@ -344,7 +347,7 @@ watch(isPerfectDay, (nowPerfect, wasPerfect) => {
         title="Dev only: simulate next day"
         @click="simulateNextDay"
       >
-        {{ isSimulatingNextDay ? '…' : '⏭ next day' }}
+        {{ isSimulatingNextDay ? 'moving…' : 'move this to the next day →' }}
       </button>
     </div>
 
@@ -611,15 +614,37 @@ watch(isPerfectDay, (nowPerfect, wasPerfect) => {
 
 .dev-next-day-button {
   position: absolute;
-  top: -14px;
-  right: 8px;
-  font-size: 0.7rem;
-  padding: 4px 8px;
-  border-radius: 10px;
-  border: 1px dashed var(--color-ink);
-  background: #fff8ea;
-  color: var(--color-text-muted);
+  top: -16px;
+  right: 10px;
+  z-index: 15;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: var(--outline-width) solid var(--color-ink);
+  background: var(--color-honey);
+  color: var(--color-text);
+  font-family: var(--font-heading);
+  font-size: 0.75rem;
+  box-shadow: 2px 3px 0 var(--color-ink);
+  transform: rotate(2deg);
   cursor: pointer;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+.dev-next-day-button:hover:not(:disabled) {
+  transform: rotate(2deg) translateY(-1px);
+  box-shadow: 3px 4px 0 var(--color-ink);
+}
+
+.dev-next-day-button:active:not(:disabled) {
+  transform: rotate(2deg) translate(2px, 3px);
+  box-shadow: 0 0 0 var(--color-ink);
+}
+
+.dev-next-day-button:disabled {
+  opacity: 0.7;
+  cursor: default;
 }
 
 .move-confirm-overlay {
