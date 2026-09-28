@@ -59,17 +59,19 @@ export interface NewTask {
 
 /**
  * One calendar day of history for the board — one day at a time (not a
- * week). dayOffset 0 is today, -1 is yesterday, etc.; canGoForward is false
- * once dayOffset reaches 0, since browsing is never allowed into the future.
- * Milestone 8b: notes is a list (a day can have several post-its), each
- * with its own task count for the board's "N tasks" label.
+ * week). dayOffset 0 is today, negative is the past, positive is the
+ * future — browsing is unbounded in both directions, since users can plan
+ * post-its ahead of time as well as look back at history. isPast marks a
+ * read-only day (its post-its are sealed history); today and every future
+ * day are editable. Milestone 8b: notes is a list (a day can have several
+ * post-its), each with its own task count for the board's "N tasks" label.
  */
 export interface DayResult {
   notes: BoardNote[]
   dateLabel: string
   dayOffset: number
   isToday: boolean
-  canGoForward: boolean
+  isPast: boolean
 }
 
 /**

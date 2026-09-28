@@ -19,7 +19,7 @@ interface TodobeeApi {
   getNoteById: (noteId: number) => Promise<Note | null>
   moveTaskToToday: (taskId: number) => Promise<Task>
   setNotePosition: (noteId: number, x: number, y: number) => Promise<void>
-  createNote: (title: string, colour: string) => Promise<BoardNote>
+  createNote: (title: string, colour: string, dayOffset: number) => Promise<BoardNote>
   renameNote: (noteId: number, title: string) => Promise<Note>
   deleteNote: (noteId: number) => Promise<void>
   /** Moves the post-it's unfinished tasks to tomorrow; resolves to how many moved. */

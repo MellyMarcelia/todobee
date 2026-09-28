@@ -188,26 +188,26 @@ app.whenReady().then(() => {
     }
   })
 
-  // Milestone 7 (revised) + 8b: history board, one day at a time, showing
-  // every post-it on that day. dayOffset 0 is today, -1 is yesterday, etc.
-  // — browsing is capped at today (canGoForward is false once dayOffset
-  // reaches 0) since there's never a future day to look at. Loading today
+  // Milestone 7 (revised) + 8b + 9: history board, one day at a time,
+  // showing every post-it on that day. dayOffset 0 is today, negative is
+  // the past, positive is the future — browsing is unbounded in both
+  // directions (§9: users can plan post-its ahead of time). Loading today
   // (dayOffset 0) runs rollover first so the default post-it and any
-  // carried-over post-its exist before we list them; past days are pure
-  // reads since a sealed day's post-its never change.
+  // carried-over post-its exist before we list them; past and future days
+  // are pure reads — a sealed past day's post-its never change, and a
+  // future day only has whatever post-its the user has pre-created on it.
   ipcMain.handle('notes:getForDay', (_event, dayOffset: number) => {
-    const clampedOffset = Math.min(dayOffset, 0)
     const today = parseDateString(todayDateString())
-    const date = addDays(today, clampedOffset)
+    const date = addDays(today, dayOffset)
     const dateString = formatDateString(date)
-    if (clampedOffset === 0) rolloverAndLog(dateString)
+    if (dayOffset === 0) rolloverAndLog(dateString)
     const notes = listNotesForDate(getDb(), dateString)
     return {
       notes,
       dateLabel: formatLongDate(date),
-      dayOffset: clampedOffset,
-      isToday: clampedOffset === 0,
-      canGoForward: clampedOffset < 0
+      dayOffset,
+      isToday: dayOffset === 0,
+      isPast: dayOffset < 0
     }
   })
   ipcMain.handle('notes:getById', (_event, noteId: number) => getNoteById(getDb(), noteId))
@@ -215,11 +215,14 @@ app.whenReady().then(() => {
     setNotePosition(getDb(), noteId, x, y)
   )
 
-  // Milestone 8b: "+ new post-it" on the board. Always created on today
-  // (you can only add post-its to the day you're actively working in).
-  ipcMain.handle('notes:create', (_event, title: string, colour: string) =>
-    createNote(getDb(), todayDateString(), title, colour)
-  )
+  // Milestone 8b + 9: "+ new post-it" on the board. dayOffset lets the user
+  // add a post-it to today or to any future day they're browsing — never to
+  // a past (sealed, read-only) day.
+  ipcMain.handle('notes:create', (_event, title: string, colour: string, dayOffset: number) => {
+    if (dayOffset < 0) throw new Error('Cannot add a post-it to a past day.')
+    const dateString = formatDateString(addDays(parseDateString(todayDateString()), dayOffset))
+    return createNote(getDb(), dateString, title, colour)
+  })
   ipcMain.handle('notes:rename', (_event, noteId: number, title: string) =>
     updateNoteTitle(getDb(), noteId, title)
   )

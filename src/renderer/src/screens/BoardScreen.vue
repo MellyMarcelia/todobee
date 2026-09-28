@@ -36,7 +36,7 @@ function previousDay(): void {
 }
 
 function nextDay(): void {
-  if (day.value?.canGoForward) dayOffset.value += 1
+  dayOffset.value += 1
 }
 
 // Milestone 7 follow-up: dragging a note around the board. It gets an
@@ -230,7 +230,7 @@ async function confirmAddNote(): Promise<void> {
   const title = newNoteTitle.value.trim()
   if (!title) return
   try {
-    await window.api.createNote(title, newNoteColour.value)
+    await window.api.createNote(title, newNoteColour.value, dayOffset.value)
     isAddingNote.value = false
     await loadDay()
   } catch (error) {
@@ -254,14 +254,7 @@ async function confirmAddNote(): Promise<void> {
       <div class="day-nav">
         <button class="day-arrow" aria-label="Previous day" @click="previousDay">‹</button>
         <span class="day-label">{{ day?.dateLabel ?? '…' }}</span>
-        <button
-          class="day-arrow"
-          aria-label="Next day"
-          :disabled="!day?.canGoForward"
-          @click="nextDay"
-        >
-          ›
-        </button>
+        <button class="day-arrow" aria-label="Next day" @click="nextDay">›</button>
       </div>
 
       <p v-if="vaultStatus && !vaultStatus.path" class="warning-banner">
@@ -271,7 +264,9 @@ async function confirmAddNote(): Promise<void> {
         Your vault folder can't be found, choose it again
       </p>
       <p v-if="loadError" class="warning-banner">Couldn't load this day: {{ loadError }}</p>
-      <p v-if="deleteError" class="warning-banner">Couldn't delete that post-it: {{ deleteError }}</p>
+      <p v-if="deleteError" class="warning-banner">
+        Couldn't delete that post-it: {{ deleteError }}
+      </p>
 
       <div ref="notesAreaRef" class="notes-area">
         <!-- Each pin is wrapped so the delete ✕ can sit beside the note's
@@ -294,13 +289,14 @@ async function confirmAddNote(): Promise<void> {
             @pointerup="endDrag($event, note, index)"
           >
             <span class="pin"><PinIcon :color="pinColorFor(note.colour)" /></span>
-            <span v-if="day?.isToday" class="today-label">today</span>
             <img v-if="note.perfectDay" :src="goodJobStamp" alt="Good job" class="mini-stamp" />
             <span class="pinned-note-title">{{ note.title }}</span>
-            <span class="pinned-note-task-count">{{ note.taskCount }} task{{ note.taskCount === 1 ? '' : 's' }}</span>
+            <span class="pinned-note-task-count"
+              >{{ note.taskCount }} task{{ note.taskCount === 1 ? '' : 's' }}</span
+            >
           </button>
           <button
-            v-if="day?.isToday && !note.sealed"
+            v-if="!day?.isPast && !note.sealed"
             class="delete-note-button"
             :aria-label="`Delete post-it ${note.title}`"
             @click="askDeleteNote(note)"
@@ -320,11 +316,24 @@ async function confirmAddNote(): Promise<void> {
           <li><strong>Open a post-it</strong> by clicking it; drag it to move it around.</li>
           <li><strong>+ new post-it</strong> (under the board) adds another one for today.</li>
           <li><strong>Hover a post-it</strong> and click ✕ to delete it with its tasks.</li>
-          <li>On a post-it: <strong>tap to add…</strong> a task, tick the box to finish it, click its text to edit it, hover and click ✕ to delete it.</li>
+          <li>
+            On a post-it: <strong>tap to add…</strong> a task, tick the box to finish it, click its
+            text to edit it, hover and click ✕ to delete it.
+          </li>
           <li><strong>Click the title</strong> of a post-it to rename it.</li>
           <li>Finish every task and the bee celebrates with a <strong>Well Done</strong> stamp.</li>
-          <li>Unfinished tasks <strong>move to the next day</strong> automatically; past days are gray and read-only.</li>
-          <li><strong>‹ ›</strong> browses earlier days; <strong>⚙</strong> picks your Obsidian vault.</li>
+          <li>
+            <strong>Move this to the next day</strong> on a post-it sends its unfinished tasks to
+            tomorrow; today's post-it stays open.
+          </li>
+          <li>
+            Anything still unfinished at the end of the day moves over automatically; past days are
+            gray and read-only.
+          </li>
+          <li>
+            <strong>‹ ›</strong> browses any day, past or future; <strong>⚙</strong> picks your
+            Obsidian vault.
+          </li>
         </ul>
         <div class="delete-confirm-buttons">
           <button class="delete-confirm-no" @click="isHelpOpen = false">Got it</button>
@@ -336,7 +345,9 @@ async function confirmAddNote(): Promise<void> {
       <div class="delete-confirm-card">
         <p class="delete-confirm-title">Delete “{{ notePendingDelete.title }}”?</p>
         <p v-if="notePendingDelete.taskCount > 0" class="delete-confirm-detail">
-          Its {{ notePendingDelete.taskCount }} task{{ notePendingDelete.taskCount === 1 ? '' : 's' }}
+          Its {{ notePendingDelete.taskCount }} task{{
+            notePendingDelete.taskCount === 1 ? '' : 's'
+          }}
           will be deleted too.
         </p>
         <div class="delete-confirm-buttons">
@@ -347,13 +358,14 @@ async function confirmAddNote(): Promise<void> {
     </div>
 
     <section class="desk">
-      <!-- Milestone 8b: "+ new post-it" — only on today, since past days
-           are read-only history. Sits just under the board, on the left. -->
-      <button v-if="day?.isToday && !isAddingNote" class="add-note-button" @click="startAddingNote">
+      <!-- Milestone 8b + 9: "+ new post-it" — on today or any future day
+           being browsed; past days are read-only history. Sits just under
+           the board, on the left. -->
+      <button v-if="!day?.isPast && !isAddingNote" class="add-note-button" @click="startAddingNote">
         + new post-it
       </button>
 
-      <div v-if="isAddingNote && day?.isToday" class="add-note-form">
+      <div v-if="isAddingNote && !day?.isPast" class="add-note-form">
         <input
           v-model="newNoteTitle"
           class="add-note-title-input"
@@ -577,18 +589,6 @@ async function confirmAddNote(): Promise<void> {
 .pinned-note-today {
   width: 100px;
   height: 100px;
-}
-
-.today-label {
-  position: absolute;
-  top: 6px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 0.65rem;
-  font-family: var(--font-heading);
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
 }
 
 .pin {

@@ -23,8 +23,8 @@ const api = {
     ipcRenderer.invoke('notes:getById', noteId),
   setNotePosition: (noteId: number, x: number, y: number): Promise<void> =>
     ipcRenderer.invoke('notes:setPosition', noteId, x, y),
-  createNote: (title: string, colour: string): Promise<BoardNote> =>
-    ipcRenderer.invoke('notes:create', title, colour),
+  createNote: (title: string, colour: string, dayOffset: number): Promise<BoardNote> =>
+    ipcRenderer.invoke('notes:create', title, colour, dayOffset),
   renameNote: (noteId: number, title: string): Promise<Note> =>
     ipcRenderer.invoke('notes:rename', noteId, title),
   deleteNote: (noteId: number): Promise<void> => ipcRenderer.invoke('notes:delete', noteId),
