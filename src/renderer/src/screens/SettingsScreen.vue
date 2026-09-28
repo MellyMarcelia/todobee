@@ -1,17 +1,17 @@
 <script setup lang="ts">
-// TL;DR: the settings page. Right now it does one thing: lets you pick
-// which Obsidian vault folder your task log gets written into.
+// The settings page. For now it does one thing: lets you pick which
+// Obsidian vault folder your task log is written into.
 import { ref, onMounted } from 'vue'
 import type { VaultStatus } from '../../../shared/types'
 
 defineEmits<{ back: [] }>()
 
-// `null` = still loading, so the template can avoid flashing a "no vault
-// chosen" warning for a split second before the real status arrives.
+// Empty (null) while still loading, so we don't flash a "no folder chosen"
+// warning for a split second before the real answer arrives.
 const vaultStatus = ref<VaultStatus | null>(null)
 const loadError = ref<string | null>(null)
 
-// Ask the backstage which folder is saved (and whether it's still there).
+// Ask which folder is saved, and whether it can still be found.
 async function loadVaultStatus(): Promise<void> {
   loadError.value = null
   try {
@@ -28,8 +28,7 @@ onMounted(loadVaultStatus)
 async function chooseFolder(): Promise<void> {
   loadError.value = null
   try {
-    // Resolves to null if the user cancels the native picker - in that
-    // case we simply leave the current status as it was.
+    // If you press Cancel we get nothing back, and nothing changes.
     const result = await window.api.chooseVaultFolder()
     if (result) vaultStatus.value = result
   } catch (error) {

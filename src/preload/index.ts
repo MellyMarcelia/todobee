@@ -1,14 +1,14 @@
-// TL;DR: the bridge between the screens and the backstage. The Vue screens
-// aren't allowed to touch the database directly, so they call
-// window.api.something(), and this passes the message on to main/index.ts
-// and hands the answer back.
+// The messenger between the screens and the behind-the-scenes part of the
+// app. For safety, screens can't touch your files or the database
+// directly. Instead they call window.api.something(), and this file passes
+// the request along to main/index.ts and brings the answer back.
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import type { Note, BoardNote, Task, NewTask, DayResult, VaultStatus } from '../shared/types'
 
-// Custom APIs for renderer
+// Every request a screen is allowed to make.
 const api = {
-  // Task CRUD (Milestone 2/4/6/8b - see main/index.ts for what each call does).
+  // Tasks: list, add, rename, tick, delete, move to today.
   listTasks: (noteId: number): Promise<Task[]> => ipcRenderer.invoke('tasks:list', noteId),
   createTask: (noteId: number, input: NewTask): Promise<Task> =>
     ipcRenderer.invoke('tasks:create', noteId, input),
@@ -20,7 +20,7 @@ const api = {
   moveTaskToToday: (taskId: number): Promise<Task> =>
     ipcRenderer.invoke('tasks:moveToToday', taskId),
 
-  // History board (Milestone 7, revised) + multiple post-its per day (Milestone 8b).
+  // Post-its: load a day, add, rename, drag, delete, push leftovers to tomorrow.
   getDayForOffset: (dayOffset: number): Promise<DayResult> =>
     ipcRenderer.invoke('notes:getForDay', dayOffset),
   getNoteById: (noteId: number): Promise<Note | null> =>
@@ -35,14 +35,12 @@ const api = {
   moveOpenTasksToNextDay: (noteId: number): Promise<number> =>
     ipcRenderer.invoke('notes:moveOpenTasksToNextDay', noteId),
 
-  // Settings / Obsidian vault folder (Milestone 5).
+  // Settings: which Obsidian vault folder to write the log into.
   getVaultStatus: (): Promise<VaultStatus> => ipcRenderer.invoke('vault:getStatus'),
   chooseVaultFolder: (): Promise<VaultStatus | null> => ipcRenderer.invoke('vault:chooseFolder')
 }
 
-// Use `contextBridge` APIs to expose Electron APIs to
-// renderer only if context isolation is enabled, otherwise
-// just add to the DOM global.
+// Hand the list above to the screens as window.api.
 if (process.contextIsolated) {
   try {
     contextBridge.exposeInMainWorld('electron', electronAPI)

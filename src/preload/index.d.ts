@@ -1,6 +1,6 @@
-// TL;DR: no real code here - it just tells TypeScript what window.api looks
-// like, so the screens get autocomplete and type checks. Keep it in sync
-// with preload/index.ts.
+// No working code here. This just lists what window.api offers, so the
+// code editor can suggest names and catch typos. If you add something to
+// preload/index.ts, add it here too.
 import { ElectronAPI } from '@electron-toolkit/preload'
 import type {
   Note,
@@ -25,7 +25,7 @@ interface TodobeeApi {
   createNote: (title: string, colour: string, dayOffset: number) => Promise<BoardNote>
   renameNote: (noteId: number, title: string) => Promise<Note>
   deleteNote: (noteId: number) => Promise<void>
-  /** Moves the post-it's unfinished tasks to tomorrow; resolves to how many moved. */
+  /** Moves the post-it's unfinished tasks to tomorrow, and says how many moved. */
   moveOpenTasksToNextDay: (noteId: number) => Promise<number>
   getVaultStatus: () => Promise<VaultStatus>
   chooseVaultFolder: () => Promise<VaultStatus | null>

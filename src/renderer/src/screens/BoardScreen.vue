@@ -1,4 +1,7 @@
 <script setup lang="ts">
+// The home screen: the corkboard. It shows every post-it for one day. You
+// can flip between days with ‹ ›, drag post-its around, add or delete
+// them, and click one to open it.
 import { ref, onMounted, watch, nextTick } from 'vue'
 import Bee from '../components/Bee.vue'
 import PinIcon from '../components/icons/PinIcon.vue'
@@ -6,23 +9,15 @@ import GearIcon from '../components/icons/GearIcon.vue'
 import goodJobStamp from '../assets/stamps/good-job-stamp.png'
 import type { VaultStatus, DayResult, BoardNote } from '../../../shared/types'
 
-// TL;DR: the home screen - the corkboard. It shows every post-it for one
-// day, lets you flip between days with ‹ ›, drag post-its around, add or
-// delete them, and click one to open it.
-
 const emit = defineEmits<{ open: [noteId: number]; 'open-settings': [] }>()
 
-// Milestone 7 (revised) + 9: history board, one day at a time. dayOffset 0
-// is today, negative is the past, positive is the future - the main process
-// does all the date math (see notes:getForDay in main/index.ts), so the
-// renderer only ever counts days back and forth.
-// Milestone 8b: a day can have several post-its now (day.notes is a list),
-// each with its own task count for the "N tasks" label.
+// Which day we're looking at, counted from today: 0 is today, -1 is
+// yesterday, 1 is tomorrow, and so on.
 const dayOffset = ref(0)
 const day = ref<DayResult | null>(null)
 const loadError = ref<string | null>(null)
 
-// Ask the backstage for the post-its on whichever day we're looking at.
+// Loads the post-its for the day we're looking at.
 async function loadDay(): Promise<void> {
   loadError.value = null
   try {
@@ -37,7 +32,7 @@ async function loadDay(): Promise<void> {
 onMounted(loadDay)
 watch(dayOffset, loadDay)
 
-// The ‹ › arrows. Changing dayOffset is enough - the watch above reloads.
+// The ‹ › arrows. Changing the day is enough - the line above reloads the board.
 function previousDay(): void {
   dayOffset.value -= 1
 }
@@ -46,12 +41,9 @@ function nextDay(): void {
   dayOffset.value += 1
 }
 
-// Milestone 7 follow-up: dragging a note around the board. It gets an
-// absolute pixel position within `.notes-area` - either a saved
-// boardX/boardY from SQLite (if the user has dragged it before) or a
-// computed default spot. Dragging uses plain pointer events (no library
-// needed) with a small movement threshold so a quick click still opens the
-// note instead of being eaten by the drag handler.
+// ---- Dragging post-its around ----
+// A post-it only counts as "dragged" once the mouse moves more than a few
+// pixels. A smaller wobble still counts as a click, which opens it.
 const DRAG_THRESHOLD_PX = 4
 const notesAreaRef = ref<HTMLElement | null>(null)
 
@@ -65,16 +57,13 @@ interface DragState {
   moved: boolean
 }
 
+// Info about the drag that's happening right now, if any.
 const dragState = ref<DragState | null>(null)
-// Live position shown while dragging/after a drag, keyed by note id - kept
-// separate from the note's own boardX/boardY so we don't have to mutate the
-// props-like `note` object directly.
+// Where each post-it is while (and just after) you drag it.
 const livePositions = ref<Record<number, { x: number; y: number }>>({})
 
-// Milestone 8b: several post-its can be on the board at once, so their
-// default (never-dragged) positions are staggered instead of stacking on
-// top of each other - a simple diagonal cascade, offset by the note's
-// position in the day's list.
+// Where a post-it goes if you've never moved it. Each one sits a little
+// lower and to the right of the one before, so they don't all stack up.
 function defaultPosition(index: number): { x: number; y: number } {
   return { x: 20 + index * 34, y: 20 + index * 34 }
 }
@@ -88,8 +77,8 @@ function positionFor(note: BoardNote, index: number): { x: number; y: number } {
   return defaultPosition(index)
 }
 
-// Mouse went down on a post-it - remember where everything started.
-// Pointer capture keeps the drag going even if the mouse slips off the note.
+// Mouse button pressed on a post-it - remember where everything started.
+// The drag keeps working even if the mouse slips off the post-it.
 function startDrag(event: PointerEvent, note: BoardNote, index: number): void {
   const current = positionFor(note, index)
   dragState.value = {
@@ -104,7 +93,7 @@ function startDrag(event: PointerEvent, note: BoardNote, index: number): void {
   ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
 }
 
-// Mouse is moving - slide the post-it along, but keep it inside the board.
+// Mouse is moving - slide the post-it along, but keep it on the board.
 function onDragMove(event: PointerEvent): void {
   const drag = dragState.value
   if (!drag || event.pointerId !== drag.pointerId) return
@@ -127,15 +116,15 @@ function onDragMove(event: PointerEvent): void {
   }
 }
 
-// Mouse let go - if it barely moved it was a click (open the note),
-// otherwise save the new spot so it stays there next time.
+// Mouse button released - if it barely moved it was a click (open the
+// post-it), otherwise save the new spot so it stays there next time.
 async function endDrag(event: PointerEvent, note: BoardNote, index: number): Promise<void> {
   const drag = dragState.value
   if (!drag || event.pointerId !== drag.pointerId) return
   dragState.value = null
 
   if (!drag.moved) {
-    // A click, not a drag - open the note as usual.
+    // A click, not a drag - open the post-it.
     emit('open', note.id)
     return
   }
@@ -148,9 +137,9 @@ async function endDrag(event: PointerEvent, note: BoardNote, index: number): Pro
   }
 }
 
-// Milestone 5: show a warning banner when no vault is chosen yet, or when
-// the previously-chosen vault folder can no longer be found. The app still
-// works normally either way - this is just a nudge to visit Settings.
+// ---- Vault warning ----
+// Shows a warning if no Obsidian folder is picked yet, or if it can't be
+// found any more. The app still works either way - it's just a reminder.
 const vaultStatus = ref<VaultStatus | null>(null)
 
 async function loadVaultStatus(): Promise<void> {
@@ -163,23 +152,22 @@ async function loadVaultStatus(): Promise<void> {
 
 onMounted(loadVaultStatus)
 
-// Reset drag-in-progress live positions when the day changes, so an old
-// drag from a different day's note (now unmounted) can't leak in.
+// When you switch days, forget any drag positions from the previous day.
 watch(day, () => {
   nextTick(() => {
     livePositions.value = {}
   })
 })
 
-// Milestone 8b + 9: "+ new post-it". Available on today and any future day
-// (you can't add a post-it to a sealed, read-only past day). Picking a colour + typing a
-// title creates the note, then the day is reloaded so it shows up pinned.
+// ---- Adding a post-it ----
+// The "+ new post-it" button. Works on today and future days (past days
+// are locked). Pick a colour, type a name, and it appears on the board.
+
+// The colours you can choose from.
 const NEW_NOTE_COLORS = ['#F6C56A', '#E76F51', '#4A90D9', '#E9A23B', '#7FB069']
-// The hexagon magnet pinning each post-it is always a different colour from
-// the post-it itself, so it stands out instead of blending in. Each post-it
-// colour gets a contrasting magnet colour; anything unexpected (e.g. an old
-// note with a colour no longer in the picker) falls back to red, or blue if
-// the note is already red.
+// The magnet on each post-it is always a different colour from the post-it,
+// so it stands out. This table says which magnet colour goes with which
+// post-it colour.
 const PIN_COLOR_FOR_NOTE: Record<string, string> = {
   '#F6C56A': '#E76F51',
   '#E76F51': '#4A90D9',
@@ -188,7 +176,8 @@ const PIN_COLOR_FOR_NOTE: Record<string, string> = {
   '#7FB069': '#E76F51'
 }
 
-// Picks the magnet colour for a post-it using the table above.
+// Picks the magnet colour for a post-it using the table above. For a colour
+// not in the table, use red - or blue if the post-it is already red.
 function pinColorFor(noteColour: string): string {
   const pin = PIN_COLOR_FOR_NOTE[noteColour.toUpperCase()]
   if (pin) return pin
@@ -209,13 +198,12 @@ function cancelAddingNote(): void {
   isAddingNote.value = false
 }
 
-// Help (?) button next to the title: a small card explaining how the board
-// and post-its work. Purely informational - closing it changes nothing.
+// The (?) help button: opens a small card explaining how the board works.
 const isHelpOpen = ref(false)
 
-// Deleting a whole post-it: the ✕ on one of today's pins asks for
-// confirmation first (it takes every task on the post-it with it), then
-// reloads the day. Past days are read-only, so their pins have no ✕.
+// ---- Deleting a post-it ----
+// The ✕ on a post-it asks "are you sure?" first, since all its tasks get
+// deleted too. Old, locked post-its don't have a ✕.
 const notePendingDelete = ref<BoardNote | null>(null)
 const deleteError = ref<string | null>(null)
 
@@ -285,8 +273,7 @@ async function confirmAddNote(): Promise<void> {
       </p>
 
       <div ref="notesAreaRef" class="notes-area">
-        <!-- Each pin is wrapped so the delete ✕ can sit beside the note's
-             own <button> (a button can't contain another button). -->
+        <!-- Each post-it plus its ✕ delete button, kept side by side. -->
         <div
           v-for="(note, index) in day?.notes ?? []"
           :key="note.id"
@@ -376,9 +363,8 @@ async function confirmAddNote(): Promise<void> {
     </div>
 
     <section class="desk">
-      <!-- Milestone 8b + 9: "+ new post-it" - on today or any future day
-           being browsed; past days are read-only history. Sits just under
-           the board, on the left. -->
+      <!-- "+ new post-it" button and form, under the board on the left.
+           Hidden on past days. -->
       <button v-if="!day?.isPast && !isAddingNote" class="add-note-button" @click="startAddingNote">
         + new post-it
       </button>
@@ -408,8 +394,7 @@ async function confirmAddNote(): Promise<void> {
         </div>
       </div>
 
-      <!-- bee sitting at the desk, bottom-right.
-           Laptop/stationery/desk removed for now - to be redesigned later. -->
+      <!-- The bee, sitting in the bottom-right corner. -->
       <div class="bee-at-desk">
         <Bee :size="150" mood="idle" />
       </div>
@@ -563,8 +548,8 @@ async function confirmAddNote(): Promise<void> {
   height: 100px;
 }
 
-/* Post-its can overlap once dragged around. Lift the one under the pointer
-   above its neighbours, so its ✕ is never hidden under another post-it. */
+/* Post-its can overlap. The one under your mouse is brought to the front,
+   so its ✕ is never hidden. */
 .pinned-note-wrap:hover,
 .pinned-note-wrap:focus-within {
   z-index: 5;
@@ -592,8 +577,8 @@ async function confirmAddNote(): Promise<void> {
   cursor: grabbing;
 }
 
-/* Past post-its are grayed out (see --color-note-past); the pin fades with
-   them, but a "Good job" stamp keeps its colour so finished days still pop. */
+/* Old post-its are greyed out, and so is their magnet. The "good job" stamp
+   keeps its colour, so finished days still stand out. */
 .pinned-note-past .pin {
   filter: grayscale(1);
   opacity: 0.6;

@@ -1,14 +1,11 @@
-// TL;DR: what the database tables look like (notes, tasks, settings), plus
-// a few fix-ups so older database files get upgraded to the current layout.
-//
-// Schema definition, split out from db.ts so it can be applied to a plain
-// better-sqlite3 Database (including an in-memory one in tests) without
-// touching Electron's app.getPath.
+// Describes how the database is laid out - think of it as three
+// spreadsheets: one for post-its ("notes"), one for tasks, and one for
+// settings. It also upgrades database files made by older versions of the
+// app so they match the current layout.
 import type Database from 'better-sqlite3'
 
 export function createSchema(db: Database.Database): void {
-  // notes = the post-its, tasks = the lines on them, settings = small
-  // key/value stuff like the vault folder.
+  // Create the three tables, but only if they don't exist yet.
   db.exec(`
     CREATE TABLE IF NOT EXISTS notes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -36,9 +33,8 @@ export function createSchema(db: Database.Database): void {
     );
   `)
 
-  // Migrations for local dev databases created before a given column
-  // existed. CREATE TABLE IF NOT EXISTS won't add columns to an
-  // already-existing table, so add them by hand if missing.
+  // Older database files may be missing some columns that were added
+  // later. Check for each one and add it if it isn't there.
   const columns = db.prepare('PRAGMA table_info(notes)').all() as { name: string }[]
   const hasSealed = columns.some((column) => column.name === 'sealed')
   if (!hasSealed) {
@@ -61,14 +57,14 @@ export function createSchema(db: Database.Database): void {
     db.exec("ALTER TABLE notes ADD COLUMN colour TEXT NOT NULL DEFAULT '#F6C56A'")
   }
 
-  // Milestone 8b: notes.note_date used to be UNIQUE (one note per day).
-  // Multiple post-its per day means that constraint has to go. SQLite has
-  // no "DROP CONSTRAINT", so rebuild the table without it, following
-  // SQLite's documented pattern for unsupported ALTER TABLE changes:
-  // create the replacement table, copy the data across, drop the old
-  // table, then rename the replacement into place - with foreign_keys
-  // temporarily off so dropping the old "notes" table (still referenced
-  // by tasks.note_id) doesn't get rejected mid-migration.
+  // Older versions only allowed one post-it per day. Now a day can have
+  // several, so that old rule has to be removed. The database can't just
+  // delete the rule, so instead we:
+  //   1. make a fresh copy of the post-its table without the rule,
+  //   2. copy all the post-its into it,
+  //   3. throw away the old table and give the new one its name.
+  // The "every task needs a real post-it" check is paused while this
+  // happens, otherwise it would complain when the old table is removed.
   const indexes = db.prepare('PRAGMA index_list(notes)').all() as {
     name: string
     unique: number

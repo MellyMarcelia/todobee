@@ -1,12 +1,10 @@
-// TL;DR: everything you can do to a single task (list, add, rename, tick,
-// delete, move) lives here, one tiny SQL query per function.
-//
-// Repository functions for notes and tasks. Kept as plain functions (no
-// classes) - each one does one query and returns plain data, matching the
-// Note/Task shapes from src/shared/types.ts.
+// Everything you can do to a single task: list them, add one, rename it,
+// tick it, delete it, or move it to another post-it. Each function talks to
+// the database once and hands back the result.
 import { getDb } from './db'
 import type { Task, NewTask } from '../shared/types'
 
+// A task exactly as the database stores it.
 interface TaskRow {
   id: number
   note_id: number
@@ -15,7 +13,7 @@ interface TaskRow {
   created_at: string
 }
 
-// Turns a raw database row (snake_case names) into the nicer Task shape the app uses.
+// Converts a task from the database's format into the format the rest of the app uses.
 function toTask(row: TaskRow): Task {
   return {
     id: row.id,
@@ -37,14 +35,14 @@ export function listTasksForNote(noteId: number): Task[] {
   return rows.map(toTask)
 }
 
-// Look up one task. Gives back null if it doesn't exist.
+// Finds one task. Gives back nothing (null) if it doesn't exist.
 export function getTaskById(taskId: number): Task | null {
   const db = getDb()
   const row = db.prepare<[number], TaskRow>('SELECT * FROM tasks WHERE id = ?').get(taskId)
   return row ? toTask(row) : null
 }
 
-// Adds a new task, then reads it back so we get its id and timestamp from the database.
+// Adds a new task, then reads it back to get the id number and time the database gave it.
 export function createTask(noteId: number, input: NewTask): Task {
   const db = getDb()
   const result = db
@@ -76,16 +74,16 @@ export function setTaskStatus(taskId: number, status: 'open' | 'done'): Task {
   return toTask(updated)
 }
 
-// Gone for good.
+// Deletes a task for good.
 export function deleteTask(taskId: number): void {
   const db = getDb()
   db.prepare('DELETE FROM tasks WHERE id = ?').run(taskId)
 }
 
 /**
- * Moves a task onto a different note and reopens it - used when a user
- * reopens a done task on a past (read-only) note and confirms "move to
- * today's note?". The task keeps its title, only its note_id and status change.
+ * Moves a task onto a different post-it and marks it as not done again.
+ * Used when you un-tick a finished task on an old, locked post-it and
+ * say "yes, move it to today".
  */
 export function moveTaskToNote(taskId: number, targetNoteId: number): Task {
   const db = getDb()

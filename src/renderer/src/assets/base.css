@@ -1,5 +1,5 @@
 :root {
-  /* --- Todobee design tokens (see PRD hand-drawn concept sketches) --- */
+  /* The app's colours, sizes and fonts, all in one place. Change one here and it changes everywhere. */
 
   /* Backgrounds */
   --color-cream: #fdf3dc; /* app background */
@@ -13,14 +13,14 @@
   --radius-board: 18px;
   --radius-note: 20px;
 
-  /* Ink / outlines - flat illustration style, no gradients or drop shadows */
+  /* Outlines - a flat, hand-drawn look with no shadows */
   --color-ink: #2b2622;
   --outline-width: 3px;
   --outline-width-thick: 4px;
 
   /* Text */
   --color-text: #3a2a1a;
-  --color-text-muted: #8c7355; /* done / muted task text, shown with strikethrough */
+  --color-text-muted: #8c7355; /* faded text, e.g. finished tasks */
 
   /* Accents */
   --color-check-green: #5e9b3c;

@@ -1,20 +1,17 @@
-// TL;DR: opens the app's database file (and creates it the first time).
-//
-// Database setup for Todobee's main process. better-sqlite3 is synchronous
-// (no async/await needed) which keeps this simple for a TypeScript beginner:
-// every call here just runs and returns, no Promises involved.
+// Opens the app's database - the file on your computer where all your
+// post-its and tasks are saved. The first time the app runs, the file
+// doesn't exist yet, so it gets created here.
 import Database from 'better-sqlite3'
 import { app } from 'electron'
 import { join } from 'path'
 import { createSchema } from './schema'
 
+// We only ever open the database once and then keep reusing it.
 let db: Database.Database | null = null
 
 /**
- * Opens (or creates) the app's SQLite file in Electron's userData folder and
- * ensures the schema exists. Safe to call more than once - createSchema uses
- * CREATE TABLE IF NOT EXISTS, so re-running this on every launch is a no-op
- * once the tables already exist.
+ * Gives back the open database, opening it first if needed. It also makes
+ * sure all the tables exist, which is harmless to repeat on every launch.
  */
 export function getDb(): Database.Database {
   if (db) return db
@@ -22,7 +19,8 @@ export function getDb(): Database.Database {
   const dbPath = join(app.getPath('userData'), 'todobee.db')
   db = new Database(dbPath)
   db.pragma('journal_mode = WAL')
-  // SQLite ignores REFERENCES constraints unless this is switched on per connection.
+  // Makes the database enforce that every task belongs to a post-it that
+  // really exists. It's off by default, so we have to switch it on.
   db.pragma('foreign_keys = ON')
   createSchema(db)
 

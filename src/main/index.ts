@@ -1,7 +1,8 @@
-// TL;DR: this is the app's backstage. It opens the window, and it answers
-// every "hey, please do X" message the screens send over (add a task, load
-// a day, delete a post-it...). The real database work lives in the *Repo.ts
-// files - this file mostly just connects the dots and writes the Obsidian log.
+// The behind-the-scenes part of the app. It opens the window, and answers
+// every request the screens send ("add this task", "load this day",
+// "delete this post-it"...). The actual saving and loading happens in the
+// *Repo.ts files - this file connects the dots and writes each change to
+// your Obsidian log.
 import { app, shell, BrowserWindow, ipcMain, dialog, Menu } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -34,7 +35,7 @@ import {
 import type { NewTask } from '../shared/types'
 import { DEFAULT_NOTE_TITLE, DEFAULT_NOTE_COLOUR } from '../shared/types'
 
-/** Today's date as "YYYY-MM-DD" in the user's local timezone. */
+/** Today's date as text, e.g. "2026-09-27", using your computer's clock. */
 function todayDateString(): string {
   const now = new Date()
   const year = now.getFullYear()
@@ -43,15 +44,14 @@ function todayDateString(): string {
   return `${year}-${month}-${day}`
 }
 
-/** Appends one task event to the vault log, using the currently saved vault path. */
+/** Writes one line about a task change into your Obsidian log. */
 function logTaskEvent(event: TaskEvent): void {
   appendTaskEvent(getVaultStatus(getDb()).path, event)
 }
 
 /**
- * Runs rollover for the given date and logs one task.edited "moved from"
- * line per task that got carried over - shared by the real launch handler
- * and the dev-only "simulate next day" handler so they can't drift apart.
+ * Carries unfinished tasks over from earlier days (see rollover.ts), then
+ * writes a "moved from <date>" line in the log for each task that moved.
  */
 function rolloverAndLog(dateString: string): ReturnType<typeof runLaunchRollover> {
   const result = runLaunchRollover(getDb(), dateString)
@@ -68,10 +68,8 @@ function rolloverAndLog(dateString: string): ReturnType<typeof runLaunchRollover
 }
 
 /**
- * Finds today's post-it with the given title+colour, or creates one if none
- * matches yet. Used both by "move this task to today" (find/create a
- * post-it matching the task's original note) and could be reused anywhere
- * else that needs "the post-it that continues this one, today".
+ * Finds today's post-it with this name and colour, or makes a new one if
+ * there isn't one yet.
  */
 function ensureTodayNoteFor(title: string, colour: string): ReturnType<typeof createNote> {
   const db = getDb()
@@ -83,9 +81,8 @@ function ensureTodayNoteFor(title: string, colour: string): ReturnType<typeof cr
   return createNote(db, todayDate, title, colour)
 }
 
-// Makes the actual app window (small and phone-ish) and loads the Vue app into it.
+// Makes the app window (small, like a phone screen) and loads the screens into it.
 function createWindow(): void {
-  // Create the browser window.
   const mainWindow = new BrowserWindow({
     width: 440,
     height: 680,
@@ -113,8 +110,8 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
-  // HMR for renderer base on electron-vite cli.
-  // Load the remote URL for development or the local html file for production.
+  // While developing, load the screens from the live dev server (so edits
+  // show up instantly). In the finished app, load them from the built files.
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
@@ -122,24 +119,20 @@ function createWindow(): void {
   }
 }
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
+// Everything below runs once the app has finished starting up.
 app.whenReady().then(() => {
-  // Set app user model id for windows
+  // Gives the app its identity on Windows (for the taskbar and notifications).
   electronApp.setAppUserModelId('com.todobee.app')
 
-  // Default open or close DevTools by F12 in development
-  // and ignore CommandOrControl + R in production.
-  // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
+  // F12 opens the developer tools while developing. In the finished app,
+  // Cmd/Ctrl+R is turned off so you can't accidentally reload the page.
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  // Cmd+,/Ctrl+, opens Settings from anywhere in the app (macOS convention,
-  // and requested for all platforms here) - a minimal app menu whose only
-  // job is that one accelerator; autoHideMenuBar keeps it out of the way on
-  // Windows/Linux, and the accelerator still fires even while hidden.
+  // A tiny app menu whose main job is the Cmd+, (Mac) / Ctrl+, (Windows,
+  // Linux) shortcut that opens Settings from anywhere. On Windows and Linux
+  // the menu bar stays hidden, but the shortcut still works.
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
       {
@@ -156,17 +149,14 @@ app.whenReady().then(() => {
     ])
   )
 
-  // Task CRUD (Milestone 2, extended with rollover in Milestone 4). Each
-  // handler is a thin wrapper around tasksRepo/notesRepo - the actual SQL
-  // lives there, this just wires it to IPC + logging. Milestone 6 adds one
-  // appendTaskEvent call per event, right after the SQL succeeds, using the
-  // current saved vault path - logging failures never throw (see
-  // obsidianLogger.ts), so a bad/missing vault can't break task management.
-  // Milestone 8b: every log line also needs the post-it's title, so each
-  // handler looks up the owning note first.
-  // Grab every task on a post-it.
+  // ---- Tasks ----
+  // Each request below does the change, then writes a line to the Obsidian
+  // log. If the log can't be written (no folder picked, folder missing...),
+  // the task change still works - the log is never allowed to break the app.
+
+  // Get every task on a post-it.
   ipcMain.handle('tasks:list', (_event, noteId: number) => listTasksForNote(noteId))
-  // Add a task, re-check the "perfect day" flag, then jot it in the log.
+  // Add a task, re-check the "good job" stamp, then write it in the log.
   ipcMain.handle('tasks:create', (_event, noteId: number, input: NewTask) => {
     const created = createTask(noteId, input)
     recalculatePerfectDay(getDb(), noteId)
@@ -220,14 +210,11 @@ app.whenReady().then(() => {
     }
   })
 
-  // Milestone 7 (revised) + 8b + 9: history board, one day at a time,
-  // showing every post-it on that day. dayOffset 0 is today, negative is
-  // the past, positive is the future - browsing is unbounded in both
-  // directions (§9: users can plan post-its ahead of time). Loading today
-  // (dayOffset 0) runs rollover first so the default post-it and any
-  // carried-over post-its exist before we list them; past and future days
-  // are pure reads - a sealed past day's post-its never change, and a
-  // future day only has whatever post-its the user has pre-created on it.
+  // ---- Post-its ----
+
+  // Load every post-it for one day. dayOffset counts days from today
+  // (0 = today, -1 = yesterday, 1 = tomorrow). When loading today, we first
+  // carry over yesterday's unfinished tasks so they show up right away.
   ipcMain.handle('notes:getForDay', (_event, dayOffset: number) => {
     const today = parseDateString(todayDateString())
     const date = addDays(today, dayOffset)
@@ -248,9 +235,8 @@ app.whenReady().then(() => {
     setNotePosition(getDb(), noteId, x, y)
   )
 
-  // Milestone 8b + 9: "+ new post-it" on the board. dayOffset lets the user
-  // add a post-it to today or to any future day they're browsing - never to
-  // a past (sealed, read-only) day.
+  // The "+ new post-it" button. Works for today and future days, but not
+  // for past days, since those are locked.
   ipcMain.handle('notes:create', (_event, title: string, colour: string, dayOffset: number) => {
     if (dayOffset < 0) throw new Error('Cannot add a post-it to a past day.')
     const dateString = formatDateString(addDays(parseDateString(todayDateString()), dayOffset))
@@ -260,10 +246,9 @@ app.whenReady().then(() => {
   ipcMain.handle('notes:rename', (_event, noteId: number, title: string) =>
     updateNoteTitle(getDb(), noteId, title)
   )
-  // Deleting a whole post-it (the ✕ on today's board). Sealed history can't
-  // be deleted - same rule as tasks on a past post-it. Every task on it is
-  // logged as task.deleted, so removing a post-it never silently drops tasks
-  // from the vault log.
+  // Delete a whole post-it (the ✕ on the board). Locked past post-its can't
+  // be deleted. Every task on it gets its own "deleted" line in the log, so
+  // nothing disappears without a trace.
   ipcMain.handle('notes:delete', (_event, noteId: number) => {
     const note = getNoteById(getDb(), noteId)
     if (!note) return
@@ -279,11 +264,10 @@ app.whenReady().then(() => {
     }
   })
 
-  // "Move this to the next day" on an open post-it: postpones its
-  // unfinished tasks to the matching post-it on tomorrow, without ending
-  // today - the post-it stays editable (and colourful) until rollover seals
-  // it when the day is actually over. Logged in today's file as one
-  // task.edited "moved to <tomorrow>" line per task.
+  // The "move this to the next day" button. Sends the post-it's unfinished
+  // tasks to the same post-it tomorrow. Today's post-it stays open with its
+  // finished tasks until the day is really over. Each moved task gets a
+  // "moved to <tomorrow>" line in the log.
   ipcMain.handle('notes:moveOpenTasksToNextDay', (_event, noteId: number) => {
     const note = getNoteById(getDb(), noteId)
     if (!note) throw new Error(`No post-it found (id ${noteId}).`)
@@ -302,11 +286,9 @@ app.whenReady().then(() => {
     return movedTitles.length
   })
 
-  // Reopening a done task on a past (read-only) note, after the user
-  // confirms "move this task to today?". Finds (or creates) the post-it on
-  // today with the same title+colour as the task's original note - the
-  // same rule rollover itself uses - moves the task there, reopens it, and
-  // logs a task.reopened line.
+  // You un-ticked a finished task on an old, locked post-it and said "yes,
+  // move it to today". Put it on today's post-it with the same name and
+  // colour (making one if needed), mark it not done, and log it.
   ipcMain.handle('tasks:moveToToday', (_event, taskId: number) => {
     const sourceTask = getTaskById(taskId)
     const sourceNote = sourceTask ? getNoteById(getDb(), sourceTask.noteId) : null
@@ -327,11 +309,11 @@ app.whenReady().then(() => {
     return moved
   })
 
-  // Milestone 5: Settings + vault folder picker. getStatus returns both the
-  // saved path and whether it currently exists on disk (the folder could
-  // have been moved/deleted since it was chosen) so the renderer can pick
-  // the right warning banner. chooseFolder opens the native macOS folder
-  // picker and saves the result; it resolves to null if the user cancels.
+  // ---- Settings ----
+
+  // Which vault folder is saved, and can it still be found?
+  // "Choose folder" opens the normal folder picker and saves your choice.
+  // If you press Cancel, nothing changes.
   ipcMain.handle('vault:getStatus', () => getVaultStatus(getDb()))
   ipcMain.handle('vault:chooseFolder', async () => {
     const mainWindow = BrowserWindow.getFocusedWindow()
@@ -346,24 +328,19 @@ app.whenReady().then(() => {
     return getVaultStatus(getDb())
   })
 
-  // Everything's wired up - now actually open the window.
+  // Everything's ready - open the window.
   createWindow()
 
+  // On Mac, clicking the dock icon when no window is open opens a new one.
   app.on('activate', function () {
-    // On macOS it's common to re-create a window in the app when the
-    // dock icon is clicked and there are no other windows open.
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
+// Closing the window quits the app - except on Mac, where apps usually
+// keep running until you press Cmd+Q.
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
 })
-
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and require them here.

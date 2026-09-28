@@ -1,18 +1,11 @@
-// TL;DR: everything you can do to a whole post-it - list a day's post-its,
-// create, rename, move on the board, delete, or push its tasks to tomorrow.
-//
-// Repository functions for looking up notes (as opposed to tasksRepo.ts,
-// which is about tasks within a note). Used by the history board - plain
-// functions over a plain better-sqlite3 Database, same pattern as the rest
-// of main/*Repo.ts, so they're testable without Electron.
-//
-// Milestone 8b: a calendar date can now have several notes (post-its), not
-// just one, so this file works in terms of "notes for a date" (plural)
-// rather than "the note for a date" (singular).
+// Everything you can do to a whole post-it: list a day's post-its, create
+// one, rename it, remember where it was dragged, delete it, or push its
+// unfinished tasks to tomorrow. (Single tasks live in tasksRepo.ts.)
 import type Database from 'better-sqlite3'
 import type { BoardNote, Note } from '../shared/types'
 import { recalculatePerfectDay } from './perfectDay'
 
+// A post-it exactly as the database stores it.
 interface NoteRow {
   id: number
   note_date: string
@@ -29,7 +22,8 @@ interface NoteRowWithTaskCount extends NoteRow {
   task_count: number
 }
 
-// Database row -> nice Note object (0/1 become true/false, snake_case becomes camelCase).
+// Converts a post-it from the database's format into the format the rest
+// of the app uses (for example, the database stores yes/no as 1/0).
 export function toNote(row: NoteRow): Note {
   return {
     id: row.id,
@@ -49,11 +43,7 @@ function toBoardNote(row: NoteRowWithTaskCount): BoardNote {
   return { ...toNote(row), taskCount: row.task_count }
 }
 
-/**
- * Every post-it note that belongs to a given calendar date, oldest-created
- * first, each with its task count - what the board needs to render its pins
- * and "N tasks" labels in one query.
- */
+/** Every post-it on one day, oldest first, each with its number of tasks. */
 export function listNotesForDate(db: Database.Database, noteDate: string): BoardNote[] {
   const rows = db
     .prepare<[string], NoteRowWithTaskCount>(
@@ -68,13 +58,13 @@ export function listNotesForDate(db: Database.Database, noteDate: string): Board
   return rows.map(toBoardNote)
 }
 
-/** A single note by id, or null if it doesn't exist. */
+/** Finds one post-it. Gives back nothing (null) if it doesn't exist. */
 export function getNoteById(db: Database.Database, noteId: number): Note | null {
   const row = db.prepare<[number], NoteRow>('SELECT * FROM notes WHERE id = ?').get(noteId)
   return row ? toNote(row) : null
 }
 
-/** Creates a new, unsealed post-it on the given date with the chosen title/colour. */
+/** Makes a new post-it on the given day, with the name and colour you chose. */
 export function createNote(
   db: Database.Database,
   noteDate: string,
@@ -87,17 +77,13 @@ export function createNote(
   return getNoteById(db, result.lastInsertRowid as number)!
 }
 
-/** Renames a post-it - clicking its title on the board/note screen. */
+/** Renames a post-it. */
 export function updateNoteTitle(db: Database.Database, noteId: number, title: string): Note {
   db.prepare('UPDATE notes SET title = ? WHERE id = ?').run(title, noteId)
   return getNoteById(db, noteId)!
 }
 
-/**
- * Saves where the user dragged a note to on the board, so it stays there
- * across restarts. Position is board-relative pixels; the renderer is
- * responsible for deciding what "relative to the board" means.
- */
+/** Remembers where you dragged a post-it on the board, so it stays there next time. */
 export function setNotePosition(db: Database.Database, noteId: number, x: number, y: number): void {
   db.prepare('UPDATE notes SET board_x = ?, board_y = ? WHERE id = ?').run(x, y, noteId)
 }
@@ -108,10 +94,9 @@ interface DeletedTaskRow {
 }
 
 /**
- * Deletes a post-it and every task on it, in one transaction so a failure
- * can't leave orphaned tasks behind. Returns the tasks that were removed
- * (title + status) so the caller can log one task.deleted line per task -
- * deleting a whole post-it must never silently drop tasks from the log.
+ * Deletes a post-it and all its tasks. It's all-or-nothing: if something
+ * goes wrong halfway, nothing is deleted. Gives back the deleted tasks so
+ * each one can be written in the log.
  */
 export function deleteNote(
   db: Database.Database,
@@ -134,16 +119,14 @@ export function deleteNote(
 }
 
 /**
- * "Move this to the next day": moves a post-it's unfinished tasks onto the
- * matching post-it (same title + colour) on `targetDate`, creating it -
- * pinned in the same board spot - if that day doesn't have one yet.
+ * The "move this to the next day" button. Moves a post-it's unfinished
+ * tasks onto the post-it with the same name and colour on another day. If
+ * that day doesn't have one yet, it's created in the same spot on the board.
  *
- * Unlike rollover, the source post-it is *not* sealed: its day isn't over,
- * so it stays editable (with its finished tasks) until rollover seals it.
- * When `targetDate` later becomes today, rollover finds the post-it already
- * there and carries on from it.
+ * The original post-it is NOT locked - its day isn't over yet, so you can
+ * keep using it.
  *
- * Returns the target post-it and the titles of the tasks that moved.
+ * Gives back the post-it the tasks went to, and the names of the moved tasks.
  */
 export function moveOpenTasksToDate(
   db: Database.Database,

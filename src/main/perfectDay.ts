@@ -1,10 +1,6 @@
-// TL;DR: decides if a post-it gets the "good job" stamp (everything ticked off).
-//
-// Derives and stores the "perfect day" flag on a note - true only when the
-// note has at least one task and every one of them is done. Called after
-// any task change (create/edit/complete/reopen/delete) on that note, so
-// perfect_day always reflects real completion rather than something the
-// renderer decides on its own.
+// Decides whether a post-it has earned the "good job" stamp: it needs at
+// least one task, and every task on it must be ticked off. This is
+// re-checked every time a task is added, ticked, un-ticked or deleted.
 import type Database from 'better-sqlite3'
 
 interface CountRow {
@@ -13,10 +9,8 @@ interface CountRow {
 }
 
 /**
- * Recomputes whether `noteId` is a "perfect day" (has tasks, and none of
- * them are open) and saves the result on the note. Returns the new value so
- * callers can react immediately (e.g. show the stamp + play the bee
- * celebration) without a second read.
+ * Counts the post-it's tasks (all of them, and how many are still not
+ * done), saves "perfect or not" on the post-it, and gives the answer back.
  */
 export function recalculatePerfectDay(db: Database.Database, noteId: number): boolean {
   const counts = db

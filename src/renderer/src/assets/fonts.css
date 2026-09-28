@@ -1,4 +1,4 @@
-/* Fonts bundled locally so the app works fully offline (no network fetch). */
+/* The fonts are stored inside the app, so it works without internet. */
 
 @font-face {
   font-family: 'Nunito';

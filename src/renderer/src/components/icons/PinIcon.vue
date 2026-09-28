@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Hexagonal pin used to "stick" notes to the corkboard.
+// The six-sided magnet that "pins" each post-it to the board.
 withDefaults(defineProps<{ color?: string }>(), { color: '#E76F51' })
 </script>
 

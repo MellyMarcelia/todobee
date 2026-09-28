@@ -1,19 +1,15 @@
 <script setup lang="ts">
-// TL;DR: one post-it, opened up big. This is where you add, tick, edit and
-// delete tasks, rename the post-it, and push leftovers to tomorrow. Finish
-// everything and you get the stamp + a happy bee. Past post-its show up
-// here too, but locked (read-only).
+// One post-it, opened up big. Here you can add, tick, edit and delete
+// tasks, rename the post-it, and push unfinished tasks to tomorrow. Finish
+// everything and you get the "good job" stamp and a happy bee. Old post-its
+// open here too, but they're locked (look, don't touch).
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import CheckIcon from '../components/icons/CheckIcon.vue'
 import Bee from '../components/Bee.vue'
 import goodJobStamp from '../assets/stamps/good-job-stamp.png'
 import type { Note, Task } from '../../../shared/types'
 
-// Milestone 8b: this screen always shows one specific post-it, opened by id
-// (there's no more "the note for today" ambiguity now that a day can have
-// several post-its). Read-only-ness is decided from the loaded note's own
-// `sealed` flag (today's post-its are always unsealed, every past post-it
-// is always sealed).
+// Which post-it to show (by its id number).
 const props = defineProps<{ noteId: number }>()
 const emit = defineEmits<{ back: [] }>()
 
@@ -21,23 +17,21 @@ const note = ref<Note | null>(null)
 const tasks = ref<Task[]>([])
 const loadError = ref<string | null>(null)
 
+// Old post-its are locked, so most buttons are switched off for them.
 const isReadOnly = computed(() => note.value?.sealed ?? false)
 
 const newTaskTitle = ref('')
 const isAddingTask = ref(false)
 
-// Which task is currently being edited inline, if any. Holding just the id
-// (not a boolean per task) keeps only one row editable at a time.
+// Which task you're currently editing, if any. Only one at a time.
 const editingTaskId = ref<number | null>(null)
 const editingTitle = ref('')
 
-// Focuses an input as soon as it's inserted. The plain `autofocus` attribute
-// isn't enough: Chromium only honors it once per page load, so the second
-// "tap to add…" or click-to-edit would show an unfocused input (and its
-// blur-to-save would never fire).
+// Puts the typing cursor straight into a text box as soon as it appears,
+// so you can start typing right away.
 const vFocus = { mounted: (el: HTMLElement) => el.focus() }
 
-// Fetches the post-it and its tasks from the backstage.
+// Loads the post-it and its tasks.
 async function loadNote(): Promise<void> {
   loadError.value = null
   hasLoadedOnce = false
@@ -49,15 +43,12 @@ async function loadNote(): Promise<void> {
     }
     note.value = loaded
     tasks.value = await window.api.listTasks(loaded.id)
-    // Wait a tick so the isPerfectDay watcher below sees this initial
-    // (possibly already-perfect) state pass through before we start
-    // treating changes as "just finished" - otherwise loading an
-    // already-perfect note would immediately trigger the celebration.
+    // Wait a moment before switching on the celebration. Otherwise opening
+    // a post-it that's already all done would make the bee celebrate.
     await nextTick()
     hasLoadedOnce = true
   } catch (error) {
-    // Without this, a failed IPC call left `note` as null forever and the
-    // whole post-it silently vanished with no visible error at all.
+    // Show the problem on screen instead of just showing nothing.
     loadError.value = error instanceof Error ? error.message : String(error)
     console.error('Failed to load note:', error)
   }
@@ -65,19 +56,18 @@ async function loadNote(): Promise<void> {
 
 onMounted(loadNote)
 
+// True only while developing - used to show the post-it's date for testing.
 const isDev = import.meta.env.DEV
 
-// "Move this to the next day": postpones this post-it's unfinished tasks to
-// the matching post-it on tomorrow. It does *not* end today - this post-it
-// stays open and colourful with its finished tasks until the day is really
-// over (rollover then seals it). Only offered while there's something
-// unfinished to move.
+// The "move this to the next day" button. Sends this post-it's unfinished
+// tasks to the same post-it tomorrow. This post-it stays open today with its
+// finished tasks. The button only shows when there's something unfinished.
 const hasOpenTasks = computed(() => tasks.value.some((t) => t.status === 'open'))
 const isMovingToNextDay = ref(false)
 const movedMessage = ref<string | null>(null)
 let movedMessageTimeout: ReturnType<typeof setTimeout> | undefined
-// Moving the open tasks away can leave only done ones behind, which counts
-// as "all done" - but postponing isn't finishing, so skip the celebration.
+// After moving tasks away, only finished ones are left, which looks like
+// "all done". But putting things off isn't finishing them, so no celebration.
 let skipNextCelebration = false
 
 async function moveOpenTasksToNextDay(): Promise<void> {
@@ -102,16 +92,17 @@ async function moveOpenTasksToNextDay(): Promise<void> {
   }
 }
 
-// Clicked "tap to add…" - swap it for a text box.
+// You clicked "tap to add…" - show a text box instead.
 function startAddingTask(): void {
   if (isReadOnly.value) return
   isAddingTask.value = true
   newTaskTitle.value = ''
 }
 
-// Pressed Enter (or clicked away) - save the new task, unless the box is empty.
+// You pressed Enter (or clicked away) - save the new task, unless the box is empty.
 async function confirmAddTask(): Promise<void> {
-  if (!isAddingTask.value) return // already confirmed (e.g. by the Enter keyup); ignore the blur that follows
+  // Pressing Enter and then clicking away both land here - only save once.
+  if (!isAddingTask.value) return
   isAddingTask.value = false
 
   const title = newTaskTitle.value.trim()
@@ -122,7 +113,7 @@ async function confirmAddTask(): Promise<void> {
   tasks.value.push(created)
 }
 
-// Flip a task between done and not done, then swap in the updated version.
+// Ticks or un-ticks a task.
 async function toggleTaskStatus(task: Task): Promise<void> {
   const nextStatus = task.status === 'open' ? 'done' : 'open'
   const updated = await window.api.setTaskStatus(task.id, nextStatus)
@@ -130,10 +121,9 @@ async function toggleTaskStatus(task: Task): Promise<void> {
   if (index !== -1) tasks.value[index] = updated
 }
 
-// A read-only past note only allows one interaction: reopening a *done*
-// task, which asks for confirmation before moving it to today's matching
-// post-it. Everything else on a read-only note (adding, editing text,
-// deleting, re-completing an already-open task) is disabled.
+// On a locked old post-it, the only thing you can do is un-tick a finished
+// task. That asks "move this task to today?" before doing anything.
+// Everything else (adding, editing, deleting) is switched off.
 const taskPendingMove = ref<Task | null>(null)
 
 function onCheckboxClick(task: Task): void {
@@ -144,7 +134,7 @@ function onCheckboxClick(task: Task): void {
   toggleTaskStatus(task)
 }
 
-// "Move to today" in the popup: send the task over, and drop it from this old post-it.
+// You said yes in the popup: move the task to today and remove it from this old post-it.
 async function confirmMoveToToday(): Promise<void> {
   const task = taskPendingMove.value
   if (!task) return
@@ -157,7 +147,7 @@ function cancelMoveToToday(): void {
   taskPendingMove.value = null
 }
 
-// Clicked a task's text - turn it into a text box so you can change it.
+// You clicked a task's text - turn it into a text box so you can change it.
 function startEditingTask(task: Task): void {
   if (isReadOnly.value) return
   editingTaskId.value = task.id
@@ -166,7 +156,8 @@ function startEditingTask(task: Task): void {
 
 // Done editing - save it, unless it's empty or nothing actually changed.
 async function confirmEditTask(task: Task): Promise<void> {
-  if (editingTaskId.value !== task.id) return // already confirmed; ignore the blur that follows
+  // Pressing Enter and then clicking away both land here - only save once.
+  if (editingTaskId.value !== task.id) return
   editingTaskId.value = null
 
   const title = editingTitle.value.trim()
@@ -184,10 +175,9 @@ async function removeTask(task: Task): Promise<void> {
   tasks.value = tasks.value.filter((t) => t.id !== task.id)
 }
 
-// "Done for now" (the folded-corner ✓) doesn't finish or delete anything -
-// it just sends the note back to pin itself on the board. A quick fly-back
-// animation plays before the screen actually switches, so the note visibly
-// flies off rather than just vanishing.
+// The ✓ in the folded corner ("done for now"). It doesn't finish or delete
+// anything - it just sends the post-it back to the board, with a short
+// fly-away animation first.
 const isFlyingBack = ref(false)
 
 function doneForNow(): void {
@@ -196,9 +186,7 @@ function doneForNow(): void {
   setTimeout(() => emit('back'), 320)
 }
 
-// Milestone 8b: the post-it's title is renamable by clicking it, same
-// click-to-edit pattern as a task's title. Only on an editable (unsealed)
-// post-it - history is read-only.
+// Click the post-it's name to rename it (not on locked old post-its).
 const isEditingTitle = ref(false)
 const editingNoteTitle = ref('')
 
@@ -218,27 +206,21 @@ async function confirmEditTitle(): Promise<void> {
   note.value = await window.api.renameNote(note.value.id, title)
 }
 
-// Milestone 8: "perfect day" stamp + bee celebration. isPerfectDay is
-// computed the exact same way the main process derives perfect_day (has at
-// least one task, and none of them are open) so the stamp always agrees
-// with what actually gets saved to the database - no separate source of
-// truth to drift out of sync.
+// The "good job" stamp shows when there's at least one task and all of them
+// are done (the same rule used when saving, in perfectDay.ts).
 const isPerfectDay = computed(
   () => tasks.value.length > 0 && tasks.value.every((t) => t.status === 'done')
 )
 
-// The celebration (bee bounce) should play once, right when the day
-// *becomes* perfect - not every time this component re-renders while it's
-// already stamped, and not when a past (read-only) note happens to load
-// already-perfect. isCelebrating + celebrationKey together give the Bee a
-// fresh :key each time so its one-shot CSS animation actually replays.
+// The happy bee should pop up once, right at the moment you tick the last
+// task - not every time you look at an already-finished post-it.
+// celebrationKey goes up by one each time, which makes the bee's animation
+// start over from the beginning.
 const isCelebrating = ref(false)
 const celebrationKey = ref(0)
 let celebrationTimeout: ReturnType<typeof setTimeout> | undefined
-// Guards against celebrating on the initial load of an already-perfect note
-// (e.g. reopening the app on a day you'd already finished, or viewing a
-// perfect day in history) - only a change that happens *after* the note has
-// finished its first load counts as "you just finished the last task".
+// Stays false until the post-it has finished loading, so opening an
+// already-finished post-it doesn't trigger the celebration.
 let hasLoadedOnce = false
 
 watch(isPerfectDay, (nowPerfect, wasPerfect) => {
@@ -291,9 +273,7 @@ watch(isPerfectDay, (nowPerfect, wasPerfect) => {
       <p v-if="isReadOnly" class="note-readonly-badge">read-only history</p>
       <p v-if="isDev" class="note-date-debug">{{ note.noteDate }}</p>
 
-      <!-- Milestone 8: "Good job" stamp, shown once every task is done.
-           Reopening a task or adding a new one removes perfect_day on the
-           main process side, which flows back here via isPerfectDay. -->
+      <!-- The "good job" stamp, shown once every task is done. -->
       <img v-if="isPerfectDay" :src="goodJobStamp" alt="Good job stamp" class="good-job-stamp" />
 
       <ul class="task-list">
@@ -354,8 +334,7 @@ watch(isPerfectDay, (nowPerfect, wasPerfect) => {
         </li>
       </ul>
 
-      <!-- folded-corner "done for now": pins the note back to the board
-           without finishing or deleting anything. Only on today's own note. -->
+      <!-- The ✓ in the folded corner: go back to the board. Not on locked post-its. -->
       <button
         v-if="!isReadOnly"
         class="fold-corner"
@@ -366,7 +345,7 @@ watch(isPerfectDay, (nowPerfect, wasPerfect) => {
         <CheckIcon />
       </button>
 
-      <!-- postpone this post-it's unfinished tasks to tomorrow (today stays open) -->
+      <!-- Send this post-it's unfinished tasks to tomorrow. -->
       <button
         v-if="!isReadOnly && hasOpenTasks"
         class="next-day-button"
@@ -379,10 +358,7 @@ watch(isPerfectDay, (nowPerfect, wasPerfect) => {
       <p v-if="movedMessage" class="moved-message">{{ movedMessage }}</p>
     </div>
 
-    <!-- Milestone 8: one-shot bee celebration, played right when the last
-         task gets ticked. :key forces a remount so the CSS animation always
-         replays, even if the day is finished more than once in a session
-         (e.g. reopen a task then finish it again). -->
+    <!-- The happy bee that pops up when you tick the last task. -->
     <div v-if="isCelebrating" class="celebration-bee">
       <Bee :key="celebrationKey" :size="90" mood="happy" />
     </div>
@@ -741,10 +717,9 @@ watch(isPerfectDay, (nowPerfect, wasPerfect) => {
   color: var(--color-text);
 }
 
-/* Milestone 8: "Good job" stamp. Pressed across almost the whole note,
-   tilted like a rubber stamp that's been pressed slightly off-angle. It's an
-   overlay drawn solidly on top of the tasks, with no pointer events so the
-   tasks underneath stay clickable through it. */
+/* The "good job" stamp: big, slightly tilted like a real rubber stamp, and
+   drawn on top of the tasks. Clicks go straight through it, so the tasks
+   underneath can still be clicked. */
 .good-job-stamp {
   position: absolute;
   top: 50%;
@@ -757,8 +732,8 @@ watch(isPerfectDay, (nowPerfect, wasPerfect) => {
   z-index: 10;
 }
 
-/* Bee celebration overlay - floats above the note, centered, so the bounce
-   animation has room to move without shifting any layout underneath it. */
+/* The happy bee floats above the post-it, so its bouncing doesn't push
+   anything else around. */
 .celebration-bee {
   position: absolute;
   top: 18%;

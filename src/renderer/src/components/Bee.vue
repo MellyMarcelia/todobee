@@ -1,11 +1,6 @@
 <script setup lang="ts">
-// TL;DR: our bee buddy! Shows the bee gif at whatever size you ask for, and
-// can bob up and down or do a happy little wiggle.
-//
-// Bee mascot. Wraps hand-made GIF assets (not drawn by us) so mood/size can
-// be swapped from one place. "happy" is the Milestone 8 celebration mood
-// (all tasks done for the day) - falls back to a bounce/wiggle CSS
-// animation on the idle art if no bee-happy.gif asset exists yet.
+// Our bee buddy! Shows the bee animation at any size, and can gently bob
+// up and down, or do a happy wiggle when you finish all your tasks.
 import { computed } from 'vue'
 import beeIdle from '../assets/bee/bee-idle.gif'
 
@@ -13,10 +8,10 @@ type Mood = 'idle' | 'happy'
 
 const props = withDefaults(
   defineProps<{
-    /** Rendered box size in pixels (square). The gif's own art keeps its aspect ratio, never stretched. */
+    /** How big the bee is, in pixels. The bee is never stretched. */
     size?: number
     mood?: Mood
-    /** Small looping up/down "typing" movement - off by default; skipped entirely under prefers-reduced-motion. */
+    /** Gentle up-and-down movement. Off unless asked for. */
     bob?: boolean
   }>(),
   {
@@ -26,27 +21,23 @@ const props = withDefaults(
   }
 )
 
-// No bee-happy.gif asset exists yet, so "happy" reuses the idle art and
-// gets its celebration from a CSS bounce/wiggle animation instead (see
-// .bee-happy below). Swap this back to a dedicated asset once one exists -
-// nothing else needs to change, moodAssets is the only place that knows.
+// Which picture to use for each mood. There's no separate "happy" picture
+// yet, so the happy bee uses the normal one plus a wiggle animation (see
+// .bee-happy below). If a happy picture is added later, just change it here.
 const moodAssets: Record<Mood, string> = {
   idle: beeIdle,
   happy: beeIdle
 }
 
-// bee-idle.gif is a 500x500 canvas, but the drawn bee doesn't fill it - there
-// is empty (now transparent) margin around it, measured once from the actual
-// file's alpha channel (not guessed): the bee's content sits inside
-// x:[186,328] y:[174,350], centered at (257, 262), covering roughly 142x176.
-// These constants crop + zoom the DISPLAY only (via CSS background
-// positioning) so the bee fills most of its box instead of looking small
-// with wasted transparent space - the original file is never touched.
-const SOURCE_SIZE = 500
-const BEE_CENTER_X = 257
+// The bee picture has a lot of empty space around the bee. These numbers
+// (measured from the picture) say where the bee actually is, so we can zoom
+// in and centre it - otherwise the bee would look tiny in its box.
+// Only what's shown on screen changes; the picture file itself is untouched.
+const SOURCE_SIZE = 500 // the picture is 500 x 500 pixels
+const BEE_CENTER_X = 257 // where the middle of the bee is
 const BEE_CENTER_Y = 262
-const BEE_CONTENT_HEIGHT = 176
-const FILL_FRACTION = 0.92 // how much of the box height the bee's content should occupy
+const BEE_CONTENT_HEIGHT = 176 // how tall the bee itself is
+const FILL_FRACTION = 0.92 // the bee should fill 92% of the box's height
 
 const scale = computed(() => (props.size * FILL_FRACTION) / BEE_CONTENT_HEIGHT)
 
@@ -84,15 +75,14 @@ const backgroundPosition = computed(() => {
   background-repeat: no-repeat;
 }
 
+/* Animations only play if your computer isn't set to "reduce motion". */
 @media (prefers-reduced-motion: no-preference) {
   .bee-bob {
     animation: bee-typing-bob 0.6s ease-in-out infinite;
   }
 
-  /* One-shot celebration wiggle/bounce, played once when this component
-     mounts with mood="happy" (the parent forces a remount with :key to
-     replay it - see TodayScreen.vue). Ends back at rest (scale/rotate 0)
-     via animation-fill-mode so the bee doesn't snap after the animation. */
+  /* The happy wiggle. Plays once each time the happy bee appears, and ends
+     back in its normal pose. */
   .bee-happy {
     animation: bee-celebrate 0.8s ease-in-out 1;
     animation-fill-mode: forwards;

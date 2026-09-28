@@ -1,8 +1,5 @@
-// TL;DR: saves and reads which Obsidian vault folder you picked.
-//
-// Repository functions for the key/value `settings` table. Kept as plain
-// functions over a plain better-sqlite3 Database - same pattern as
-// tasksRepo.ts and rollover.ts - so they're testable without Electron.
+// Remembers which Obsidian vault folder you picked in Settings, so the app
+// knows where to write your task log.
 import type Database from 'better-sqlite3'
 import { existsSync } from 'fs'
 import type { VaultStatus } from '../shared/types'
@@ -13,7 +10,7 @@ interface SettingRow {
   value: string | null
 }
 
-/** Returns the saved Obsidian vault folder path, or null if none has been chosen yet. */
+/** The saved vault folder, or nothing (null) if you haven't picked one yet. */
 export function getVaultPath(db: Database.Database): string | null {
   const row = db
     .prepare<[string], SettingRow>('SELECT value FROM settings WHERE key = ?')
@@ -21,7 +18,7 @@ export function getVaultPath(db: Database.Database): string | null {
   return row?.value ?? null
 }
 
-/** Saves the chosen Obsidian vault folder path, replacing any previous value. */
+/** Saves the folder you picked, replacing the old one if there was one. */
 export function setVaultPath(db: Database.Database, path: string): void {
   db.prepare(
     'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
@@ -29,9 +26,9 @@ export function setVaultPath(db: Database.Database, path: string): void {
 }
 
 /**
- * The saved vault path plus whether that folder still exists on disk right
- * now - the renderer uses `exists` to decide which warning banner to show
- * (no vault chosen yet, vs. a chosen vault that got moved/deleted).
+ * The saved folder, plus whether it can still be found on your computer.
+ * The screens use this to show the right warning: "pick a folder" or
+ * "we can't find your folder any more".
  */
 export function getVaultStatus(db: Database.Database): VaultStatus {
   const path = getVaultPath(db)
