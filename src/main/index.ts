@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog, Menu } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -128,6 +128,26 @@ app.whenReady().then(() => {
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
+
+  // Cmd+,/Ctrl+, opens Settings from anywhere in the app (macOS convention,
+  // and requested for all platforms here) — a minimal app menu whose only
+  // job is that one accelerator; autoHideMenuBar keeps it out of the way on
+  // Windows/Linux, and the accelerator still fires even while hidden.
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate([
+      {
+        label: app.name,
+        submenu: [
+          {
+            label: 'Settings…',
+            accelerator: 'CmdOrCtrl+,',
+            click: () => BrowserWindow.getFocusedWindow()?.webContents.send('open-settings')
+          },
+          { role: 'quit' }
+        ]
+      }
+    ])
+  )
 
   // Task CRUD (Milestone 2, extended with rollover in Milestone 4). Each
   // handler is a thin wrapper around tasksRepo/notesRepo — the actual SQL

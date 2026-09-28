@@ -86,8 +86,8 @@ Both are independent Electron apps, each with its own local SQLite database, sha
 - [ ] Each pinned post-it on the board shows its title and task count (e.g. "4 tasks"), and a tiny stamp graphic if and only if it earned a "perfect day" badge.
 - [ ] Clicking a "+ new post-it" button on today's or a future day's board, choosing a colour, and typing a title creates a new post-it on that day with an empty task list, pinned on the board.
 - [ ] Hovering a pinned post-it on today's or a future day's board reveals a small ✕; clicking it shows a confirmation naming the post-it and its task count, then deletes it and every one of its tasks together, logging one `task.deleted` line per deleted task. This ✕ never appears on a sealed (past) post-it.
-- [ ] Clicking a post-it's title while viewing it (on an editable, today's post-it) lets the user rename it; the new title is saved and used by future rollover matching.
-- [ ] Clicking one of today's pinned post-its opens it full-screen as an editable note.
+- [ ] Clicking a post-it's title while viewing it (on any editable post-it — today's or a future day's) lets the user rename it; the new title is saved and used by future rollover matching.
+- [ ] Clicking one of today's or a future day's pinned post-its opens it full-screen as an editable note.
 - [ ] Clicking a past (non-today) pinned post-it opens it full-screen, read-only: its tasks are visible but cannot be added, edited, or deleted from that view — only a done task's reopen action is available.
 - [ ] On an editable post-it, adding a task via the "tap to add…" row, ticking a task's checkbox, clicking a task to edit it, and revealing a small ✕ to delete a task on hover all work as described and match the existing create/edit/complete/delete acceptance criteria above.
 - [ ] Ticking the last remaining open task on a post-it shows both the "Good job" stamp and switches the bee to its happy pose (celebration), matching the existing "perfect day" acceptance criterion above.
