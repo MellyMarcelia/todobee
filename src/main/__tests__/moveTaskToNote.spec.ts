@@ -61,9 +61,7 @@ describe('moveTaskToNote', () => {
 
     moveTaskToNote(taskId, todayNoteId)
 
-    const remaining = db
-      .prepare('SELECT * FROM tasks WHERE note_id = ?')
-      .all(pastNoteId)
+    const remaining = db.prepare('SELECT * FROM tasks WHERE note_id = ?').all(pastNoteId)
     expect(remaining).toEqual([])
   })
 })

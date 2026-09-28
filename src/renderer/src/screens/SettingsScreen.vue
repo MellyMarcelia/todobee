@@ -46,9 +46,7 @@ async function chooseFolder(): Promise<void> {
     <div class="note">
       <h1 class="note-title">settings</h1>
 
-      <p v-if="loadError" class="warning-banner">
-        Something went wrong: {{ loadError }}
-      </p>
+      <p v-if="loadError" class="warning-banner">Something went wrong: {{ loadError }}</p>
       <template v-else-if="vaultStatus">
         <p v-if="!vaultStatus.path" class="warning-banner">
           Choose your Obsidian vault in Settings so your tasks get logged

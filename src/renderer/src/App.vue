@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import BoardScreen from './screens/BoardScreen.vue'
 import TodayScreen from './screens/TodayScreen.vue'
 import SettingsScreen from './screens/SettingsScreen.vue'
@@ -18,6 +18,21 @@ function openNote(noteId: number): void {
   openedNoteId.value = noteId
   currentScreen.value = 'today'
 }
+
+// Cmd/Ctrl+, opens Settings from the app menu (see main/index.ts), same as
+// clicking the board's gear icon — the main process just tells us to switch
+// screens, it doesn't know or care which screen we were on before.
+function openSettingsFromMenu(): void {
+  currentScreen.value = 'settings'
+}
+
+onMounted(() => {
+  window.electron.ipcRenderer.on('open-settings', openSettingsFromMenu)
+})
+
+onUnmounted(() => {
+  window.electron.ipcRenderer.removeListener('open-settings', openSettingsFromMenu)
+})
 </script>
 
 <template>
@@ -27,5 +42,9 @@ function openNote(noteId: number): void {
     @open-settings="currentScreen = 'settings'"
   />
   <SettingsScreen v-else-if="currentScreen === 'settings'" @back="currentScreen = 'board'" />
-  <TodayScreen v-else-if="openedNoteId !== undefined" :note-id="openedNoteId" @back="currentScreen = 'board'" />
+  <TodayScreen
+    v-else-if="openedNoteId !== undefined"
+    :note-id="openedNoteId"
+    @back="currentScreen = 'board'"
+  />
 </template>
