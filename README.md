@@ -2,6 +2,15 @@
 
 A cozy, sticky-note style to-do list with a bee mascot — one corkboard per day, one or more post-its per day, unfinished tasks roll forward automatically. Built as a small offline Electron desktop app for a university course ("Development 5"), used daily to track the author's own software development work all semester.
 
+![Todobee board screenshot](./screenshots/board.png)
+
+<!--
+  TODO (manual step, screen-recording permission wasn't available to the
+  assistant that wrote this README): take a screenshot of the running app
+  — `npm run dev`, then Cmd+Shift+4 (macOS) and drag around the window —
+  save it as screenshots/board.png in this repo, and remove this comment.
+-->
+
 Todobee logs every task event (created / edited / completed / reopened / deleted) as plain, human-readable markdown into an Obsidian vault of your choosing — an honest, append-only record you actually own, not locked into the app.
 
 Its sibling app, **[Beemodoro](https://github.com/MellyMarcelia/beemodoro)**, is a separate focus-timer app with the same bee theme; the two are fully independent (separate codebases, separate local databases) and only share the same Obsidian vault as an optional common log destination. See `PRD.md` in this repo for the full product spec, technical decisions, and acceptance criteria.
