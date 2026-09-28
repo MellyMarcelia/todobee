@@ -1,5 +1,5 @@
 // Repository functions for notes and tasks. Kept as plain functions (no
-// classes) — each one does one query and returns plain data, matching the
+// classes) - each one does one query and returns plain data, matching the
 // Note/Task shapes from src/shared/types.ts.
 import { getDb } from './db'
 import type { Task, NewTask } from '../shared/types'
@@ -73,7 +73,7 @@ export function deleteTask(taskId: number): void {
 }
 
 /**
- * Moves a task onto a different note and reopens it — used when a user
+ * Moves a task onto a different note and reopens it - used when a user
  * reopens a done task on a past (read-only) note and confirms "move to
  * today's note?". The task keeps its title, only its note_id and status change.
  */

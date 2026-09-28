@@ -24,7 +24,7 @@ onMounted(loadVaultStatus)
 async function chooseFolder(): Promise<void> {
   loadError.value = null
   try {
-    // Resolves to null if the user cancels the native picker — in that
+    // Resolves to null if the user cancels the native picker - in that
     // case we simply leave the current status as it was.
     const result = await window.api.chooseVaultFolder()
     if (result) vaultStatus.value = result

@@ -4,7 +4,7 @@ import { createSchema } from '../schema'
 import { runLaunchRollover } from '../rollover'
 import { DEFAULT_NOTE_TITLE, DEFAULT_NOTE_COLOUR } from '../../shared/types'
 
-// Seam under test: runLaunchRollover(db, todayDate) — a pure function over a
+// Seam under test: runLaunchRollover(db, todayDate) - a pure function over a
 // better-sqlite3 Database, so these tests run against a real in-memory
 // database instead of mocking SQL. No Electron involved.
 

@@ -10,7 +10,7 @@ let db: Database.Database | null = null
 
 /**
  * Opens (or creates) the app's SQLite file in Electron's userData folder and
- * ensures the schema exists. Safe to call more than once — createSchema uses
+ * ensures the schema exists. Safe to call more than once - createSchema uses
  * CREATE TABLE IF NOT EXISTS, so re-running this on every launch is a no-op
  * once the tables already exist.
  */

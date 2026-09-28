@@ -1,5 +1,5 @@
 // Repository functions for looking up notes (as opposed to tasksRepo.ts,
-// which is about tasks within a note). Used by the history board — plain
+// which is about tasks within a note). Used by the history board - plain
 // functions over a plain better-sqlite3 Database, same pattern as the rest
 // of main/*Repo.ts, so they're testable without Electron.
 //
@@ -46,7 +46,7 @@ function toBoardNote(row: NoteRowWithTaskCount): BoardNote {
 
 /**
  * Every post-it note that belongs to a given calendar date, oldest-created
- * first, each with its task count — what the board needs to render its pins
+ * first, each with its task count - what the board needs to render its pins
  * and "N tasks" labels in one query.
  */
 export function listNotesForDate(db: Database.Database, noteDate: string): BoardNote[] {
@@ -82,7 +82,7 @@ export function createNote(
   return getNoteById(db, result.lastInsertRowid as number)!
 }
 
-/** Renames a post-it — clicking its title on the board/note screen. */
+/** Renames a post-it - clicking its title on the board/note screen. */
 export function updateNoteTitle(db: Database.Database, noteId: number, title: string): Note {
   db.prepare('UPDATE notes SET title = ? WHERE id = ?').run(title, noteId)
   return getNoteById(db, noteId)!
@@ -105,7 +105,7 @@ interface DeletedTaskRow {
 /**
  * Deletes a post-it and every task on it, in one transaction so a failure
  * can't leave orphaned tasks behind. Returns the tasks that were removed
- * (title + status) so the caller can log one task.deleted line per task —
+ * (title + status) so the caller can log one task.deleted line per task -
  * deleting a whole post-it must never silently drop tasks from the log.
  */
 export function deleteNote(
@@ -130,8 +130,8 @@ export function deleteNote(
 
 /**
  * "Move this to the next day": moves a post-it's unfinished tasks onto the
- * matching post-it (same title + colour) on `targetDate`, creating it —
- * pinned in the same board spot — if that day doesn't have one yet.
+ * matching post-it (same title + colour) on `targetDate`, creating it -
+ * pinned in the same board spot - if that day doesn't have one yet.
  *
  * Unlike rollover, the source post-it is *not* sealed: its day isn't over,
  * so it stays editable (with its finished tasks) until rollover seals it.

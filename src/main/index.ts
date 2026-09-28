@@ -46,7 +46,7 @@ function logTaskEvent(event: TaskEvent): void {
 
 /**
  * Runs rollover for the given date and logs one task.edited "moved from"
- * line per task that got carried over — shared by the real launch handler
+ * line per task that got carried over - shared by the real launch handler
  * and the dev-only "simulate next day" handler so they can't drift apart.
  */
 function rolloverAndLog(dateString: string): ReturnType<typeof runLaunchRollover> {
@@ -130,7 +130,7 @@ app.whenReady().then(() => {
   })
 
   // Cmd+,/Ctrl+, opens Settings from anywhere in the app (macOS convention,
-  // and requested for all platforms here) — a minimal app menu whose only
+  // and requested for all platforms here) - a minimal app menu whose only
   // job is that one accelerator; autoHideMenuBar keeps it out of the way on
   // Windows/Linux, and the accelerator still fires even while hidden.
   Menu.setApplicationMenu(
@@ -150,10 +150,10 @@ app.whenReady().then(() => {
   )
 
   // Task CRUD (Milestone 2, extended with rollover in Milestone 4). Each
-  // handler is a thin wrapper around tasksRepo/notesRepo — the actual SQL
+  // handler is a thin wrapper around tasksRepo/notesRepo - the actual SQL
   // lives there, this just wires it to IPC + logging. Milestone 6 adds one
   // appendTaskEvent call per event, right after the SQL succeeds, using the
-  // current saved vault path — logging failures never throw (see
+  // current saved vault path - logging failures never throw (see
   // obsidianLogger.ts), so a bad/missing vault can't break task management.
   // Milestone 8b: every log line also needs the post-it's title, so each
   // handler looks up the owning note first.
@@ -210,11 +210,11 @@ app.whenReady().then(() => {
 
   // Milestone 7 (revised) + 8b + 9: history board, one day at a time,
   // showing every post-it on that day. dayOffset 0 is today, negative is
-  // the past, positive is the future — browsing is unbounded in both
+  // the past, positive is the future - browsing is unbounded in both
   // directions (§9: users can plan post-its ahead of time). Loading today
   // (dayOffset 0) runs rollover first so the default post-it and any
   // carried-over post-its exist before we list them; past and future days
-  // are pure reads — a sealed past day's post-its never change, and a
+  // are pure reads - a sealed past day's post-its never change, and a
   // future day only has whatever post-its the user has pre-created on it.
   ipcMain.handle('notes:getForDay', (_event, dayOffset: number) => {
     const today = parseDateString(todayDateString())
@@ -236,7 +236,7 @@ app.whenReady().then(() => {
   )
 
   // Milestone 8b + 9: "+ new post-it" on the board. dayOffset lets the user
-  // add a post-it to today or to any future day they're browsing — never to
+  // add a post-it to today or to any future day they're browsing - never to
   // a past (sealed, read-only) day.
   ipcMain.handle('notes:create', (_event, title: string, colour: string, dayOffset: number) => {
     if (dayOffset < 0) throw new Error('Cannot add a post-it to a past day.')
@@ -247,7 +247,7 @@ app.whenReady().then(() => {
     updateNoteTitle(getDb(), noteId, title)
   )
   // Deleting a whole post-it (the ✕ on today's board). Sealed history can't
-  // be deleted — same rule as tasks on a past post-it. Every task on it is
+  // be deleted - same rule as tasks on a past post-it. Every task on it is
   // logged as task.deleted, so removing a post-it never silently drops tasks
   // from the vault log.
   ipcMain.handle('notes:delete', (_event, noteId: number) => {
@@ -267,7 +267,7 @@ app.whenReady().then(() => {
 
   // "Move this to the next day" on an open post-it: postpones its
   // unfinished tasks to the matching post-it on tomorrow, without ending
-  // today — the post-it stays editable (and colourful) until rollover seals
+  // today - the post-it stays editable (and colourful) until rollover seals
   // it when the day is actually over. Logged in today's file as one
   // task.edited "moved to <tomorrow>" line per task.
   ipcMain.handle('notes:moveOpenTasksToNextDay', (_event, noteId: number) => {
@@ -290,8 +290,8 @@ app.whenReady().then(() => {
 
   // Reopening a done task on a past (read-only) note, after the user
   // confirms "move this task to today?". Finds (or creates) the post-it on
-  // today with the same title+colour as the task's original note — the
-  // same rule rollover itself uses — moves the task there, reopens it, and
+  // today with the same title+colour as the task's original note - the
+  // same rule rollover itself uses - moves the task there, reopens it, and
   // logs a task.reopened line.
   ipcMain.handle('tasks:moveToToday', (_event, taskId: number) => {
     const sourceTask = getTaskById(taskId)

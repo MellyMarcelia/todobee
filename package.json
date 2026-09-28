@@ -1,7 +1,7 @@
 {
   "name": "todobee",
   "version": "0.1.0",
-  "description": "Todobee — a cozy sticky-note style to-do list with a bee mascot",
+  "description": "Todobee - a cozy sticky-note style to-do list with a bee mascot",
   "main": "./out/main/index.js",
   "author": "Melly",
   "homepage": "https://electron-vite.org",

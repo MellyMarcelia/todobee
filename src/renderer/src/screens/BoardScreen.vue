@@ -9,7 +9,7 @@ import type { VaultStatus, DayResult, BoardNote } from '../../../shared/types'
 const emit = defineEmits<{ open: [noteId: number]; 'open-settings': [] }>()
 
 // Milestone 7 (revised): history board, one day at a time. dayOffset 0 is
-// today, negative is further into the past — the main process does all the
+// today, negative is further into the past - the main process does all the
 // date math (see notes:getForDay in main/index.ts) and also caps forward
 // paging at today, so the renderer never has to reason about "the future".
 // Milestone 8b: a day can have several post-its now (day.notes is a list),
@@ -40,7 +40,7 @@ function nextDay(): void {
 }
 
 // Milestone 7 follow-up: dragging a note around the board. It gets an
-// absolute pixel position within `.notes-area` — either a saved
+// absolute pixel position within `.notes-area` - either a saved
 // boardX/boardY from SQLite (if the user has dragged it before) or a
 // computed default spot. Dragging uses plain pointer events (no library
 // needed) with a small movement threshold so a quick click still opens the
@@ -59,14 +59,14 @@ interface DragState {
 }
 
 const dragState = ref<DragState | null>(null)
-// Live position shown while dragging/after a drag, keyed by note id — kept
+// Live position shown while dragging/after a drag, keyed by note id - kept
 // separate from the note's own boardX/boardY so we don't have to mutate the
 // props-like `note` object directly.
 const livePositions = ref<Record<number, { x: number; y: number }>>({})
 
 // Milestone 8b: several post-its can be on the board at once, so their
 // default (never-dragged) positions are staggered instead of stacking on
-// top of each other — a simple diagonal cascade, offset by the note's
+// top of each other - a simple diagonal cascade, offset by the note's
 // position in the day's list.
 function defaultPosition(index: number): { x: number; y: number } {
   return { x: 20 + index * 34, y: 20 + index * 34 }
@@ -121,7 +121,7 @@ async function endDrag(event: PointerEvent, note: BoardNote, index: number): Pro
   dragState.value = null
 
   if (!drag.moved) {
-    // A click, not a drag — open the note as usual.
+    // A click, not a drag - open the note as usual.
     emit('open', note.id)
     return
   }
@@ -136,7 +136,7 @@ async function endDrag(event: PointerEvent, note: BoardNote, index: number): Pro
 
 // Milestone 5: show a warning banner when no vault is chosen yet, or when
 // the previously-chosen vault folder can no longer be found. The app still
-// works normally either way — this is just a nudge to visit Settings.
+// works normally either way - this is just a nudge to visit Settings.
 const vaultStatus = ref<VaultStatus | null>(null)
 
 async function loadVaultStatus(): Promise<void> {
@@ -195,7 +195,7 @@ function cancelAddingNote(): void {
 }
 
 // Help (?) button next to the title: a small card explaining how the board
-// and post-its work. Purely informational — closing it changes nothing.
+// and post-its work. Purely informational - closing it changes nothing.
 const isHelpOpen = ref(false)
 
 // Deleting a whole post-it: the ✕ on one of today's pins asks for
@@ -358,7 +358,7 @@ async function confirmAddNote(): Promise<void> {
     </div>
 
     <section class="desk">
-      <!-- Milestone 8b + 9: "+ new post-it" — on today or any future day
+      <!-- Milestone 8b + 9: "+ new post-it" - on today or any future day
            being browsed; past days are read-only history. Sits just under
            the board, on the left. -->
       <button v-if="!day?.isPast && !isAddingNote" class="add-note-button" @click="startAddingNote">
@@ -391,7 +391,7 @@ async function confirmAddNote(): Promise<void> {
       </div>
 
       <!-- bee sitting at the desk, bottom-right.
-           Laptop/stationery/desk removed for now — to be redesigned later. -->
+           Laptop/stationery/desk removed for now - to be redesigned later. -->
       <div class="bee-at-desk">
         <Bee :size="150" mood="idle" />
       </div>

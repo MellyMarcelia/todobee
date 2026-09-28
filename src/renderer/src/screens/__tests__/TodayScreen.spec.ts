@@ -9,7 +9,7 @@ import type { Note, Task } from '../../../../shared/types'
 // wired to confirmAddTask. Pressing Enter ran confirmAddTask, which set
 // isAddingTask = false *before* the createTask IPC call resolved. Vue
 // reacted to that by unmounting the (still-focused) input immediately,
-// and removing a focused element from the DOM fires a native blur event —
+// and removing a focused element from the DOM fires a native blur event -
 // which fired confirmAddTask a second time with the same leftover title,
 // creating a second task via a second IPC call.
 //
@@ -33,7 +33,7 @@ function makeTask(id: number, title: string): Task {
   return { id, noteId: fakeNote.id, title, status: 'open', createdAt: '2026-09-27 00:00:00' }
 }
 
-describe('TodayScreen — adding a task', () => {
+describe('TodayScreen - adding a task', () => {
   beforeEach(() => {
     let nextId = 100
     window.api = {
@@ -63,7 +63,7 @@ describe('TodayScreen — adding a task', () => {
     await input.trigger('keyup.enter')
 
     // In real Chromium (which Electron runs on), removing the still-focused
-    // input from the DOM at this point fires a native blur event — jsdom
+    // input from the DOM at this point fires a native blur event - jsdom
     // does not replicate that quirk, so we fire it ourselves to reproduce
     // the exact sequence that caused the duplicate in the real app.
     await input.trigger('blur')

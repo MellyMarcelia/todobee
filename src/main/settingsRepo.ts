@@ -1,6 +1,6 @@
 // Repository functions for the key/value `settings` table. Kept as plain
-// functions over a plain better-sqlite3 Database — same pattern as
-// tasksRepo.ts and rollover.ts — so they're testable without Electron.
+// functions over a plain better-sqlite3 Database - same pattern as
+// tasksRepo.ts and rollover.ts - so they're testable without Electron.
 import type Database from 'better-sqlite3'
 import { existsSync } from 'fs'
 import type { VaultStatus } from '../shared/types'
@@ -28,7 +28,7 @@ export function setVaultPath(db: Database.Database, path: string): void {
 
 /**
  * The saved vault path plus whether that folder still exists on disk right
- * now — the renderer uses `exists` to decide which warning banner to show
+ * now - the renderer uses `exists` to decide which warning banner to show
  * (no vault chosen yet, vs. a chosen vault that got moved/deleted).
  */
 export function getVaultStatus(db: Database.Database): VaultStatus {

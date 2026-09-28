@@ -4,7 +4,7 @@ import type { Note, BoardNote, Task, NewTask, DayResult, VaultStatus } from '../
 
 // Custom APIs for renderer
 const api = {
-  // Task CRUD (Milestone 2/4/6/8b — see main/index.ts for what each call does).
+  // Task CRUD (Milestone 2/4/6/8b - see main/index.ts for what each call does).
   listTasks: (noteId: number): Promise<Task[]> => ipcRenderer.invoke('tasks:list', noteId),
   createTask: (noteId: number, input: NewTask): Promise<Task> =>
     ipcRenderer.invoke('tasks:create', noteId, input),

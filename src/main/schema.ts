@@ -61,7 +61,7 @@ export function createSchema(db: Database.Database): void {
   // no "DROP CONSTRAINT", so rebuild the table without it, following
   // SQLite's documented pattern for unsupported ALTER TABLE changes:
   // create the replacement table, copy the data across, drop the old
-  // table, then rename the replacement into place — with foreign_keys
+  // table, then rename the replacement into place - with foreign_keys
   // temporarily off so dropping the old "notes" table (still referenced
   // by tasks.note_id) doesn't get rejected mid-migration.
   const indexes = db.prepare('PRAGMA index_list(notes)').all() as {

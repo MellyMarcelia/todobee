@@ -5,7 +5,7 @@ import { join } from 'path'
 import { formatTimestamp, formatLogLine, logFilePath, appendTaskEvent } from '../obsidianLogger'
 
 // Fixed instant: 2026-09-27T17:30:12.000Z is 19:30:12 in Europe/Brussels
-// (UTC+02:00, daylight saving in effect in September) — matches the exact
+// (UTC+02:00, daylight saving in effect in September) - matches the exact
 // example line from the milestone spec.
 const FIXED_INSTANT = new Date('2026-09-27T17:30:12.000Z')
 
@@ -41,7 +41,7 @@ describe('formatLogLine', () => {
       'Europe/Brussels'
     )
     expect(line).toBe(
-      '- **2026-09-27 19:30:12 (Europe/Brussels, UTC+02:00)** — `task.created` — Status: open — "kerjain pr" — Note: "School"'
+      '- **2026-09-27 19:30:12 (Europe/Brussels, UTC+02:00)** - `task.created` - Status: open - "kerjain pr" - Note: "School"'
     )
   })
 
@@ -58,7 +58,7 @@ describe('formatLogLine', () => {
       'Europe/Brussels'
     )
     expect(line).toBe(
-      '- **2026-09-27 19:30:12 (Europe/Brussels, UTC+02:00)** — `task.edited` — Status: open — "kerjain pr" — Note: "today\'s buzz" — moved from 2026-09-26'
+      '- **2026-09-27 19:30:12 (Europe/Brussels, UTC+02:00)** - `task.edited` - Status: open - "kerjain pr" - Note: "today\'s buzz" - moved from 2026-09-26'
     )
   })
 
@@ -75,7 +75,7 @@ describe('formatLogLine', () => {
       'Europe/Brussels'
     )
     expect(line).toBe(
-      '- **2026-09-27 19:30:12 (Europe/Brussels, UTC+02:00)** — `task.edited` — Status: open — "kerjain pr" — Note: "School" — moved to 2026-09-28'
+      '- **2026-09-27 19:30:12 (Europe/Brussels, UTC+02:00)** - `task.edited` - Status: open - "kerjain pr" - Note: "School" - moved to 2026-09-28'
     )
   })
 })
@@ -113,7 +113,7 @@ describe('appendTaskEvent', () => {
     const filePath = logFilePath(vaultDir, FIXED_INSTANT, 'Europe/Brussels')
     expect(existsSync(filePath)).toBe(true)
     expect(readFileSync(filePath, 'utf-8')).toBe(
-      '- **2026-09-27 19:30:12 (Europe/Brussels, UTC+02:00)** — `task.created` — Status: open — "kerjain pr" — Note: "today\'s buzz"\n'
+      '- **2026-09-27 19:30:12 (Europe/Brussels, UTC+02:00)** - `task.created` - Status: open - "kerjain pr" - Note: "today\'s buzz"\n'
     )
   })
 

@@ -1,4 +1,4 @@
-// Derives and stores the "perfect day" flag on a note — true only when the
+// Derives and stores the "perfect day" flag on a note - true only when the
 // note has at least one task and every one of them is done. Called after
 // any task change (create/edit/complete/reopen/delete) on that note, so
 // perfect_day always reflects real completion rather than something the

@@ -46,7 +46,7 @@ async function loadNote(): Promise<void> {
     tasks.value = await window.api.listTasks(loaded.id)
     // Wait a tick so the isPerfectDay watcher below sees this initial
     // (possibly already-perfect) state pass through before we start
-    // treating changes as "just finished" — otherwise loading an
+    // treating changes as "just finished" - otherwise loading an
     // already-perfect note would immediately trigger the celebration.
     await nextTick()
     hasLoadedOnce = true
@@ -63,7 +63,7 @@ onMounted(loadNote)
 const isDev = import.meta.env.DEV
 
 // "Move this to the next day": postpones this post-it's unfinished tasks to
-// the matching post-it on tomorrow. It does *not* end today — this post-it
+// the matching post-it on tomorrow. It does *not* end today - this post-it
 // stays open and colourful with its finished tasks until the day is really
 // over (rollover then seals it). Only offered while there's something
 // unfinished to move.
@@ -72,7 +72,7 @@ const isMovingToNextDay = ref(false)
 const movedMessage = ref<string | null>(null)
 let movedMessageTimeout: ReturnType<typeof setTimeout> | undefined
 // Moving the open tasks away can leave only done ones behind, which counts
-// as "all done" — but postponing isn't finishing, so skip the celebration.
+// as "all done" - but postponing isn't finishing, so skip the celebration.
 let skipNextCelebration = false
 
 async function moveOpenTasksToNextDay(): Promise<void> {
@@ -172,7 +172,7 @@ async function removeTask(task: Task): Promise<void> {
   tasks.value = tasks.value.filter((t) => t.id !== task.id)
 }
 
-// "Done for now" (the folded-corner ✓) doesn't finish or delete anything —
+// "Done for now" (the folded-corner ✓) doesn't finish or delete anything -
 // it just sends the note back to pin itself on the board. A quick fly-back
 // animation plays before the screen actually switches, so the note visibly
 // flies off rather than just vanishing.
@@ -186,7 +186,7 @@ function doneForNow(): void {
 
 // Milestone 8b: the post-it's title is renamable by clicking it, same
 // click-to-edit pattern as a task's title. Only on an editable (unsealed)
-// post-it — history is read-only.
+// post-it - history is read-only.
 const isEditingTitle = ref(false)
 const editingNoteTitle = ref('')
 
@@ -209,14 +209,14 @@ async function confirmEditTitle(): Promise<void> {
 // Milestone 8: "perfect day" stamp + bee celebration. isPerfectDay is
 // computed the exact same way the main process derives perfect_day (has at
 // least one task, and none of them are open) so the stamp always agrees
-// with what actually gets saved to the database — no separate source of
+// with what actually gets saved to the database - no separate source of
 // truth to drift out of sync.
 const isPerfectDay = computed(
   () => tasks.value.length > 0 && tasks.value.every((t) => t.status === 'done')
 )
 
 // The celebration (bee bounce) should play once, right when the day
-// *becomes* perfect — not every time this component re-renders while it's
+// *becomes* perfect - not every time this component re-renders while it's
 // already stamped, and not when a past (read-only) note happens to load
 // already-perfect. isCelebrating + celebrationKey together give the Bee a
 // fresh :key each time so its one-shot CSS animation actually replays.
@@ -225,7 +225,7 @@ const celebrationKey = ref(0)
 let celebrationTimeout: ReturnType<typeof setTimeout> | undefined
 // Guards against celebrating on the initial load of an already-perfect note
 // (e.g. reopening the app on a day you'd already finished, or viewing a
-// perfect day in history) — only a change that happens *after* the note has
+// perfect day in history) - only a change that happens *after* the note has
 // finished its first load counts as "you just finished the last task".
 let hasLoadedOnce = false
 
@@ -348,7 +348,7 @@ watch(isPerfectDay, (nowPerfect, wasPerfect) => {
         v-if="!isReadOnly"
         class="fold-corner"
         aria-label="Done for now"
-        title="Done for now — pin back to the board"
+        title="Done for now - pin back to the board"
         @click="doneForNow"
       >
         <CheckIcon />
@@ -744,7 +744,7 @@ watch(isPerfectDay, (nowPerfect, wasPerfect) => {
   z-index: 10;
 }
 
-/* Bee celebration overlay — floats above the note, centered, so the bounce
+/* Bee celebration overlay - floats above the note, centered, so the bounce
    animation has room to move without shifting any layout underneath it. */
 .celebration-bee {
   position: absolute;

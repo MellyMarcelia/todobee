@@ -9,7 +9,7 @@ import SettingsScreen from './screens/SettingsScreen.vue'
 type Screen = 'board' | 'today' | 'settings'
 const currentScreen = ref<Screen>('board')
 
-// Milestone 8b: which post-it to open on the "today" screen — every post-it
+// Milestone 8b: which post-it to open on the "today" screen - every post-it
 // (today's or a past one) is opened by its own note id now that a day can
 // have several of them, rather than by date.
 const openedNoteId = ref<number | undefined>(undefined)
@@ -20,7 +20,7 @@ function openNote(noteId: number): void {
 }
 
 // Cmd/Ctrl+, opens Settings from the app menu (see main/index.ts), same as
-// clicking the board's gear icon — the main process just tells us to switch
+// clicking the board's gear icon - the main process just tells us to switch
 // screens, it doesn't know or care which screen we were on before.
 function openSettingsFromMenu(): void {
   currentScreen.value = 'settings'

@@ -1,5 +1,5 @@
 // Append-only Obsidian logging (Milestone 6). One bullet line per task
-// event, appended to <vault>/Todobee/Tasks/YYYY/YYYY-MM/YYYY-MM-DD.md — the
+// event, appended to <vault>/Todobee/Tasks/YYYY/YYYY-MM/YYYY-MM-DD.md - the
 // file for the day the event actually happened (in the user's local
 // timezone). Never rewrites or truncates existing content: every write here
 // uses fs.appendFileSync, which only ever adds bytes to the end of the file.
@@ -14,7 +14,7 @@ export interface TaskEvent {
   type: TaskEventType
   status: 'open' | 'done'
   title: string
-  /** Which post-it the task lives on, e.g. "today's buzz", "School" — Milestone 8b. */
+  /** Which post-it the task lives on, e.g. "today's buzz", "School" - Milestone 8b. */
   noteTitle: string
   /**
    * Set only for the rollover case: a task.edited event that moved a task
@@ -37,7 +37,7 @@ function pad2(n: number): string {
 /**
  * Reads a Date's calendar date/time fields as they appear in a given IANA
  * timezone (not the system timezone, not UTC). Intl.DateTimeFormat with a
- * `timeZone` option is the standard way to do this in JavaScript — it's
+ * `timeZone` option is the standard way to do this in JavaScript - it's
  * effectively "what would a clock on the wall in that timezone show?".
  */
 function partsInTimeZone(
@@ -55,7 +55,7 @@ function partsInTimeZone(
     hour12: false
   })
   const parts = Object.fromEntries(formatter.formatToParts(date).map((p) => [p.type, p.value]))
-  // Some locales/environments render midnight as "24" instead of "00" — normalize it.
+  // Some locales/environments render midnight as "24" instead of "00" - normalize it.
   const hour = parts.hour === '24' ? '00' : parts.hour
   return {
     year: parts.year,
@@ -75,7 +75,7 @@ function utcOffset(date: Date, timeZone: string): string {
   })
   const tzPart =
     formatter.formatToParts(date).find((p) => p.type === 'timeZoneName')?.value ?? 'GMT+0'
-  // tzPart looks like "GMT+2" or "GMT-4:30" — normalize to "+02:00" / "-04:30".
+  // tzPart looks like "GMT+2" or "GMT-4:30" - normalize to "+02:00" / "-04:30".
   const match = tzPart.match(/GMT([+-])(\d+)(?::(\d+))?/)
   if (!match) return '+00:00'
   const sign = match[1]
@@ -86,7 +86,7 @@ function utcOffset(date: Date, timeZone: string): string {
 
 /**
  * Formats an instant as "YYYY-MM-DD HH:MM:SS (Zone/Name, UTC+HH:MM)" in the
- * given timezone — the exact timestamp format required on every log line.
+ * given timezone - the exact timestamp format required on every log line.
  */
 export function formatTimestamp(date: Date, timeZone: string): string {
   const p = partsInTimeZone(date, timeZone)
@@ -97,14 +97,14 @@ export function formatTimestamp(date: Date, timeZone: string): string {
 /** Formats one bullet line for a task event, in the exact spec format. */
 export function formatLogLine(event: TaskEvent, date: Date, timeZone: string): string {
   const timestamp = formatTimestamp(date, timeZone)
-  let line = `- **${timestamp}** — \`${event.type}\` — Status: ${event.status} — "${event.title}" — Note: "${event.noteTitle}"`
-  if (event.movedFrom) line += ` — moved from ${event.movedFrom}`
-  if (event.movedTo) line += ` — moved to ${event.movedTo}`
+  let line = `- **${timestamp}** - \`${event.type}\` - Status: ${event.status} - "${event.title}" - Note: "${event.noteTitle}"`
+  if (event.movedFrom) line += ` - moved from ${event.movedFrom}`
+  if (event.movedTo) line += ` - moved to ${event.movedTo}`
   return line
 }
 
 /**
- * The log file path for the day an event happened, in the given timezone —
+ * The log file path for the day an event happened, in the given timezone -
  * <vault>/Todobee/Tasks/YYYY/YYYY-MM/YYYY-MM-DD.md. Using the timezone-local
  * date (not UTC) matters right at the day boundary: an event just after
  * midnight local time must not land in the previous UTC day's file.
@@ -133,7 +133,7 @@ export function logFilePath(vaultPath: string, date: Date, timeZone: string): st
  *   the console but swallowed, since a logging failure must never break
  *   the app's actual task management.
  *
- * Uses appendFileSync, which only ever adds bytes to the end of a file —
+ * Uses appendFileSync, which only ever adds bytes to the end of a file -
  * it cannot rewrite or truncate lines that are already there, even across
  * separate app restarts.
  */

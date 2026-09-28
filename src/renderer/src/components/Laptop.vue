@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Laptop, seen from a 3/4 back angle (screen tilted away, base peeking out
-// at an angle beneath it) — redrawn as a flat SVG matching the pose/
+// at an angle beneath it) - redrawn as a flat SVG matching the pose/
 // proportions of a reference photo, in our thin-outline flat style
 // (2px ink outline, soft grey body, no gradients).
 withDefaults(defineProps<{ size?: number }>(), { size: 120 })
