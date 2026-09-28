@@ -1,3 +1,6 @@
+// TL;DR: the "what does a post-it / task / day look like" definitions that
+// both the backstage (main) and the screens (renderer) agree on.
+//
 // Shared data shapes used by main, preload, and renderer. Kept as plain
 // TypeScript interfaces (no classes, no generics) since these are just
 // "shape of the data" descriptions - this is the beginner-friendly level of

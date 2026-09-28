@@ -1,4 +1,8 @@
 <script setup lang="ts">
+// TL;DR: one post-it, opened up big. This is where you add, tick, edit and
+// delete tasks, rename the post-it, and push leftovers to tomorrow. Finish
+// everything and you get the stamp + a happy bee. Past post-its show up
+// here too, but locked (read-only).
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import CheckIcon from '../components/icons/CheckIcon.vue'
 import Bee from '../components/Bee.vue'
@@ -33,6 +37,7 @@ const editingTitle = ref('')
 // blur-to-save would never fire).
 const vFocus = { mounted: (el: HTMLElement) => el.focus() }
 
+// Fetches the post-it and its tasks from the backstage.
 async function loadNote(): Promise<void> {
   loadError.value = null
   hasLoadedOnce = false
@@ -97,12 +102,14 @@ async function moveOpenTasksToNextDay(): Promise<void> {
   }
 }
 
+// Clicked "tap to add…" - swap it for a text box.
 function startAddingTask(): void {
   if (isReadOnly.value) return
   isAddingTask.value = true
   newTaskTitle.value = ''
 }
 
+// Pressed Enter (or clicked away) - save the new task, unless the box is empty.
 async function confirmAddTask(): Promise<void> {
   if (!isAddingTask.value) return // already confirmed (e.g. by the Enter keyup); ignore the blur that follows
   isAddingTask.value = false
@@ -115,6 +122,7 @@ async function confirmAddTask(): Promise<void> {
   tasks.value.push(created)
 }
 
+// Flip a task between done and not done, then swap in the updated version.
 async function toggleTaskStatus(task: Task): Promise<void> {
   const nextStatus = task.status === 'open' ? 'done' : 'open'
   const updated = await window.api.setTaskStatus(task.id, nextStatus)
@@ -136,6 +144,7 @@ function onCheckboxClick(task: Task): void {
   toggleTaskStatus(task)
 }
 
+// "Move to today" in the popup: send the task over, and drop it from this old post-it.
 async function confirmMoveToToday(): Promise<void> {
   const task = taskPendingMove.value
   if (!task) return
@@ -148,12 +157,14 @@ function cancelMoveToToday(): void {
   taskPendingMove.value = null
 }
 
+// Clicked a task's text - turn it into a text box so you can change it.
 function startEditingTask(task: Task): void {
   if (isReadOnly.value) return
   editingTaskId.value = task.id
   editingTitle.value = task.title
 }
 
+// Done editing - save it, unless it's empty or nothing actually changed.
 async function confirmEditTask(task: Task): Promise<void> {
   if (editingTaskId.value !== task.id) return // already confirmed; ignore the blur that follows
   editingTaskId.value = null
@@ -166,6 +177,7 @@ async function confirmEditTask(task: Task): Promise<void> {
   if (index !== -1) tasks.value[index] = updated
 }
 
+// The ✕ next to a task - delete it.
 async function removeTask(task: Task): Promise<void> {
   if (isReadOnly.value) return
   await window.api.deleteTask(task.id)
@@ -375,6 +387,7 @@ watch(isPerfectDay, (nowPerfect, wasPerfect) => {
       <Bee :key="celebrationKey" :size="90" mood="happy" />
     </div>
 
+    <!-- "Move this task to today?" popup, for re-opening a task on an old post-it -->
     <div v-if="taskPendingMove" class="move-confirm-overlay">
       <div class="move-confirm-card">
         <p>Move this task to today?</p>

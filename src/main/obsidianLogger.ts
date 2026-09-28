@@ -1,3 +1,7 @@
+// TL;DR: every time you add/tick/edit/delete a task, this writes one line
+// about it into a daily Markdown file in your Obsidian vault. It only ever
+// adds lines, never changes old ones.
+//
 // Append-only Obsidian logging (Milestone 6). One bullet line per task
 // event, appended to <vault>/Todobee/Tasks/YYYY/YYYY-MM/YYYY-MM-DD.md - the
 // file for the day the event actually happened (in the user's local

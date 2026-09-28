@@ -1,9 +1,14 @@
+// TL;DR: what the database tables look like (notes, tasks, settings), plus
+// a few fix-ups so older database files get upgraded to the current layout.
+//
 // Schema definition, split out from db.ts so it can be applied to a plain
 // better-sqlite3 Database (including an in-memory one in tests) without
 // touching Electron's app.getPath.
 import type Database from 'better-sqlite3'
 
 export function createSchema(db: Database.Database): void {
+  // notes = the post-its, tasks = the lines on them, settings = small
+  // key/value stuff like the vault folder.
   db.exec(`
     CREATE TABLE IF NOT EXISTS notes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

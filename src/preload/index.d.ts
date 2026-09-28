@@ -1,3 +1,6 @@
+// TL;DR: no real code here - it just tells TypeScript what window.api looks
+// like, so the screens get autocomplete and type checks. Keep it in sync
+// with preload/index.ts.
 import { ElectronAPI } from '@electron-toolkit/preload'
 import type {
   Note,

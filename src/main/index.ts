@@ -1,3 +1,7 @@
+// TL;DR: this is the app's backstage. It opens the window, and it answers
+// every "hey, please do X" message the screens send over (add a task, load
+// a day, delete a post-it...). The real database work lives in the *Repo.ts
+// files - this file mostly just connects the dots and writes the Obsidian log.
 import { app, shell, BrowserWindow, ipcMain, dialog, Menu } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -79,6 +83,7 @@ function ensureTodayNoteFor(title: string, colour: string): ReturnType<typeof cr
   return createNote(db, todayDate, title, colour)
 }
 
+// Makes the actual app window (small and phone-ish) and loads the Vue app into it.
 function createWindow(): void {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
@@ -97,10 +102,12 @@ function createWindow(): void {
     }
   })
 
+  // Only show the window once it's drawn, so you don't get a blank white flash.
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
   })
 
+  // Any link that tries to open a new window goes to your normal browser instead.
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
     return { action: 'deny' }
@@ -157,7 +164,9 @@ app.whenReady().then(() => {
   // obsidianLogger.ts), so a bad/missing vault can't break task management.
   // Milestone 8b: every log line also needs the post-it's title, so each
   // handler looks up the owning note first.
+  // Grab every task on a post-it.
   ipcMain.handle('tasks:list', (_event, noteId: number) => listTasksForNote(noteId))
+  // Add a task, re-check the "perfect day" flag, then jot it in the log.
   ipcMain.handle('tasks:create', (_event, noteId: number, input: NewTask) => {
     const created = createTask(noteId, input)
     recalculatePerfectDay(getDb(), noteId)
@@ -170,6 +179,7 @@ app.whenReady().then(() => {
     })
     return created
   })
+  // Rename a task.
   ipcMain.handle('tasks:updateTitle', (_event, taskId: number, title: string) => {
     const updated = updateTaskTitle(taskId, title)
     const note = getNoteById(getDb(), updated.noteId)
@@ -181,6 +191,7 @@ app.whenReady().then(() => {
     })
     return updated
   })
+  // Tick or un-tick a task.
   ipcMain.handle('tasks:setStatus', (_event, taskId: number, status: 'open' | 'done') => {
     const updated = setTaskStatus(taskId, status)
     recalculatePerfectDay(getDb(), updated.noteId)
@@ -193,6 +204,7 @@ app.whenReady().then(() => {
     })
     return updated
   })
+  // Delete a task. We read it first so we still know what to write in the log.
   ipcMain.handle('tasks:delete', (_event, taskId: number) => {
     const task = getTaskById(taskId)
     deleteTask(taskId)
@@ -230,6 +242,7 @@ app.whenReady().then(() => {
       isPast: dayOffset < 0
     }
   })
+  // Fetch one post-it, and save where it got dragged to on the board.
   ipcMain.handle('notes:getById', (_event, noteId: number) => getNoteById(getDb(), noteId))
   ipcMain.handle('notes:setPosition', (_event, noteId: number, x: number, y: number) =>
     setNotePosition(getDb(), noteId, x, y)
@@ -243,6 +256,7 @@ app.whenReady().then(() => {
     const dateString = formatDateString(addDays(parseDateString(todayDateString()), dayOffset))
     return createNote(getDb(), dateString, title, colour)
   })
+  // Rename a post-it.
   ipcMain.handle('notes:rename', (_event, noteId: number, title: string) =>
     updateNoteTitle(getDb(), noteId, title)
   )
@@ -332,6 +346,7 @@ app.whenReady().then(() => {
     return getVaultStatus(getDb())
   })
 
+  // Everything's wired up - now actually open the window.
   createWindow()
 
   app.on('activate', function () {

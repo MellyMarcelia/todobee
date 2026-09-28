@@ -1,3 +1,5 @@
+// TL;DR: saves and reads which Obsidian vault folder you picked.
+//
 // Repository functions for the key/value `settings` table. Kept as plain
 // functions over a plain better-sqlite3 Database - same pattern as
 // tasksRepo.ts and rollover.ts - so they're testable without Electron.

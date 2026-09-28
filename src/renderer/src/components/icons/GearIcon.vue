@@ -1,3 +1,4 @@
+<!-- TL;DR: the settings gear on the board. It takes the colour of whatever it sits in. -->
 <template>
   <svg viewBox="0 0 24 24" class="gear-icon" xmlns="http://www.w3.org/2000/svg">
     <circle cx="12" cy="12" r="3" />

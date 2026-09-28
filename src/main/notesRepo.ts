@@ -1,3 +1,6 @@
+// TL;DR: everything you can do to a whole post-it - list a day's post-its,
+// create, rename, move on the board, delete, or push its tasks to tomorrow.
+//
 // Repository functions for looking up notes (as opposed to tasksRepo.ts,
 // which is about tasks within a note). Used by the history board - plain
 // functions over a plain better-sqlite3 Database, same pattern as the rest
@@ -26,6 +29,7 @@ interface NoteRowWithTaskCount extends NoteRow {
   task_count: number
 }
 
+// Database row -> nice Note object (0/1 become true/false, snake_case becomes camelCase).
 export function toNote(row: NoteRow): Note {
   return {
     id: row.id,
@@ -40,6 +44,7 @@ export function toNote(row: NoteRow): Note {
   }
 }
 
+// Same thing, plus the task count the board shows ("3 tasks").
 function toBoardNote(row: NoteRowWithTaskCount): BoardNote {
   return { ...toNote(row), taskCount: row.task_count }
 }

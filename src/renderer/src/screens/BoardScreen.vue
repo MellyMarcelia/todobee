@@ -6,18 +6,23 @@ import GearIcon from '../components/icons/GearIcon.vue'
 import goodJobStamp from '../assets/stamps/good-job-stamp.png'
 import type { VaultStatus, DayResult, BoardNote } from '../../../shared/types'
 
+// TL;DR: the home screen - the corkboard. It shows every post-it for one
+// day, lets you flip between days with ‹ ›, drag post-its around, add or
+// delete them, and click one to open it.
+
 const emit = defineEmits<{ open: [noteId: number]; 'open-settings': [] }>()
 
-// Milestone 7 (revised): history board, one day at a time. dayOffset 0 is
-// today, negative is further into the past - the main process does all the
-// date math (see notes:getForDay in main/index.ts) and also caps forward
-// paging at today, so the renderer never has to reason about "the future".
+// Milestone 7 (revised) + 9: history board, one day at a time. dayOffset 0
+// is today, negative is the past, positive is the future - the main process
+// does all the date math (see notes:getForDay in main/index.ts), so the
+// renderer only ever counts days back and forth.
 // Milestone 8b: a day can have several post-its now (day.notes is a list),
 // each with its own task count for the "N tasks" label.
 const dayOffset = ref(0)
 const day = ref<DayResult | null>(null)
 const loadError = ref<string | null>(null)
 
+// Ask the backstage for the post-its on whichever day we're looking at.
 async function loadDay(): Promise<void> {
   loadError.value = null
   try {
@@ -28,9 +33,11 @@ async function loadDay(): Promise<void> {
   }
 }
 
+// Load once on open, and again every time you flip to another day.
 onMounted(loadDay)
 watch(dayOffset, loadDay)
 
+// The ‹ › arrows. Changing dayOffset is enough - the watch above reloads.
 function previousDay(): void {
   dayOffset.value -= 1
 }
@@ -72,6 +79,8 @@ function defaultPosition(index: number): { x: number; y: number } {
   return { x: 20 + index * 34, y: 20 + index * 34 }
 }
 
+// Where should this post-it sit? Mid-drag spot first, then its saved spot,
+// then the default spot if it's never been moved.
 function positionFor(note: BoardNote, index: number): { x: number; y: number } {
   const live = livePositions.value[note.id]
   if (live) return live
@@ -79,6 +88,8 @@ function positionFor(note: BoardNote, index: number): { x: number; y: number } {
   return defaultPosition(index)
 }
 
+// Mouse went down on a post-it - remember where everything started.
+// Pointer capture keeps the drag going even if the mouse slips off the note.
 function startDrag(event: PointerEvent, note: BoardNote, index: number): void {
   const current = positionFor(note, index)
   dragState.value = {
@@ -93,6 +104,7 @@ function startDrag(event: PointerEvent, note: BoardNote, index: number): void {
   ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
 }
 
+// Mouse is moving - slide the post-it along, but keep it inside the board.
 function onDragMove(event: PointerEvent): void {
   const drag = dragState.value
   if (!drag || event.pointerId !== drag.pointerId) return
@@ -115,6 +127,8 @@ function onDragMove(event: PointerEvent): void {
   }
 }
 
+// Mouse let go - if it barely moved it was a click (open the note),
+// otherwise save the new spot so it stays there next time.
 async function endDrag(event: PointerEvent, note: BoardNote, index: number): Promise<void> {
   const drag = dragState.value
   if (!drag || event.pointerId !== drag.pointerId) return
@@ -157,8 +171,8 @@ watch(day, () => {
   })
 })
 
-// Milestone 8b: "+ new post-it". Only available on today (you can't add a
-// post-it to a sealed, read-only past day). Picking a colour + typing a
+// Milestone 8b + 9: "+ new post-it". Available on today and any future day
+// (you can't add a post-it to a sealed, read-only past day). Picking a colour + typing a
 // title creates the note, then the day is reloaded so it shows up pinned.
 const NEW_NOTE_COLORS = ['#F6C56A', '#E76F51', '#4A90D9', '#E9A23B', '#7FB069']
 // The hexagon magnet pinning each post-it is always a different colour from
@@ -174,6 +188,7 @@ const PIN_COLOR_FOR_NOTE: Record<string, string> = {
   '#7FB069': '#E76F51'
 }
 
+// Picks the magnet colour for a post-it using the table above.
 function pinColorFor(noteColour: string): string {
   const pin = PIN_COLOR_FOR_NOTE[noteColour.toUpperCase()]
   if (pin) return pin
@@ -226,6 +241,7 @@ async function confirmDeleteNote(): Promise<void> {
   }
 }
 
+// "Add" in the new post-it form - create it (needs a title), then reload the day.
 async function confirmAddNote(): Promise<void> {
   const title = newNoteTitle.value.trim()
   if (!title) return
@@ -309,6 +325,7 @@ async function confirmAddNote(): Promise<void> {
       </div>
     </section>
 
+    <!-- the "?" help popup - click outside it or "Got it" to close -->
     <div v-if="isHelpOpen" class="delete-confirm-overlay" @click.self="isHelpOpen = false">
       <div class="delete-confirm-card help-card">
         <p class="delete-confirm-title">How Todobee works</p>
@@ -341,6 +358,7 @@ async function confirmAddNote(): Promise<void> {
       </div>
     </div>
 
+    <!-- "are you sure?" popup before a post-it gets deleted -->
     <div v-if="notePendingDelete" class="delete-confirm-overlay">
       <div class="delete-confirm-card">
         <p class="delete-confirm-title">Delete “{{ notePendingDelete.title }}”?</p>

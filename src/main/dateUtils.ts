@@ -1,8 +1,12 @@
+// TL;DR: little date helpers - turn dates into "2026-09-27" strings and
+// back, add/subtract days, and make the pretty "Sun 27 Sep 2026" label.
+//
 // Small local-calendar-date helpers shared by rollover/notesRepo/index.ts.
 // "Local" matters: note_date strings (e.g. "2026-09-27") represent plain
 // calendar days with no attached timezone, so all date math here uses the
 // system's local Date getters (getFullYear/getMonth/getDate), never UTC -
 // consistent with how todayDateString() in index.ts already builds them.
+// 7 -> "07", so months and days always have two digits.
 function pad2(n: number): string {
   return String(n).padStart(2, '0')
 }

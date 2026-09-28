@@ -1,4 +1,7 @@
 <script setup lang="ts">
+// TL;DR: a little laptop drawing. Not used anywhere right now - it was
+// taken off the desk until the desk gets redesigned (see BoardScreen.vue).
+//
 // Laptop, seen from a 3/4 back angle (screen tilted away, base peeking out
 // at an angle beneath it) - redrawn as a flat SVG matching the pose/
 // proportions of a reference photo, in our thin-outline flat style

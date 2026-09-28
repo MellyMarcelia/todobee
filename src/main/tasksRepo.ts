@@ -1,3 +1,6 @@
+// TL;DR: everything you can do to a single task (list, add, rename, tick,
+// delete, move) lives here, one tiny SQL query per function.
+//
 // Repository functions for notes and tasks. Kept as plain functions (no
 // classes) - each one does one query and returns plain data, matching the
 // Note/Task shapes from src/shared/types.ts.
@@ -12,6 +15,7 @@ interface TaskRow {
   created_at: string
 }
 
+// Turns a raw database row (snake_case names) into the nicer Task shape the app uses.
 function toTask(row: TaskRow): Task {
   return {
     id: row.id,
@@ -22,6 +26,7 @@ function toTask(row: TaskRow): Task {
   }
 }
 
+// All the tasks on one post-it, oldest first.
 export function listTasksForNote(noteId: number): Task[] {
   const db = getDb()
   const rows = db
@@ -32,12 +37,14 @@ export function listTasksForNote(noteId: number): Task[] {
   return rows.map(toTask)
 }
 
+// Look up one task. Gives back null if it doesn't exist.
 export function getTaskById(taskId: number): Task | null {
   const db = getDb()
   const row = db.prepare<[number], TaskRow>('SELECT * FROM tasks WHERE id = ?').get(taskId)
   return row ? toTask(row) : null
 }
 
+// Adds a new task, then reads it back so we get its id and timestamp from the database.
 export function createTask(noteId: number, input: NewTask): Task {
   const db = getDb()
   const result = db
@@ -51,6 +58,7 @@ export function createTask(noteId: number, input: NewTask): Task {
   return toTask(created)
 }
 
+// Renames a task.
 export function updateTaskTitle(taskId: number, title: string): Task {
   const db = getDb()
   db.prepare('UPDATE tasks SET title = ? WHERE id = ?').run(title, taskId)
@@ -59,6 +67,7 @@ export function updateTaskTitle(taskId: number, title: string): Task {
   return toTask(updated)
 }
 
+// Ticks a task ("done") or un-ticks it ("open").
 export function setTaskStatus(taskId: number, status: 'open' | 'done'): Task {
   const db = getDb()
   db.prepare('UPDATE tasks SET status = ? WHERE id = ?').run(status, taskId)
@@ -67,6 +76,7 @@ export function setTaskStatus(taskId: number, status: 'open' | 'done'): Task {
   return toTask(updated)
 }
 
+// Gone for good.
 export function deleteTask(taskId: number): void {
   const db = getDb()
   db.prepare('DELETE FROM tasks WHERE id = ?').run(taskId)

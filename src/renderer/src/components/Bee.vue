@@ -1,4 +1,7 @@
 <script setup lang="ts">
+// TL;DR: our bee buddy! Shows the bee gif at whatever size you ask for, and
+// can bob up and down or do a happy little wiggle.
+//
 // Bee mascot. Wraps hand-made GIF assets (not drawn by us) so mood/size can
 // be swapped from one place. "happy" is the Milestone 8 celebration mood
 // (all tasks done for the day) - falls back to a bounce/wiggle CSS

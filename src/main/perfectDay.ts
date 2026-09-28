@@ -1,3 +1,5 @@
+// TL;DR: decides if a post-it gets the "good job" stamp (everything ticked off).
+//
 // Derives and stores the "perfect day" flag on a note - true only when the
 // note has at least one task and every one of them is done. Called after
 // any task change (create/edit/complete/reopen/delete) on that note, so

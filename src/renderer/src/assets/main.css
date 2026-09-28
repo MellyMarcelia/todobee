@@ -1,3 +1,5 @@
+/* TL;DR: pulls in the fonts + colours, and makes the app fill the whole
+   window without scrolling or text getting accidentally highlighted. */
 @import './fonts.css';
 @import './base.css';
 

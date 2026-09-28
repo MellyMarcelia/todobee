@@ -1,3 +1,7 @@
+// TL;DR: the bridge between the screens and the backstage. The Vue screens
+// aren't allowed to touch the database directly, so they call
+// window.api.something(), and this passes the message on to main/index.ts
+// and hands the answer back.
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import type { Note, BoardNote, Task, NewTask, DayResult, VaultStatus } from '../shared/types'

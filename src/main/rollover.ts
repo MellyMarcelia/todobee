@@ -1,3 +1,7 @@
+// TL;DR: the "new day" magic. When you open the app on a new day, anything
+// you didn't finish yesterday hops over to today, and yesterday's post-its
+// get locked as read-only history.
+//
 // Launch-time rollover: ensures today has at least the default post-it, and
 // moves any unfinished tasks from yesterday's (unsealed) post-its onto
 // matching post-its on today - sealing every one of yesterday's post-its as
@@ -30,6 +34,7 @@ interface NoteRow {
   created_at: string
 }
 
+// Database row -> nice Note object (0/1 become true/false, snake_case becomes camelCase).
 function toNote(row: NoteRow): Note {
   return {
     id: row.id,
@@ -126,6 +131,7 @@ export function runLaunchRollover(db: Database.Database, todayDate: string): Rol
       return created
     }
 
+    // For each older post-it: move its unfinished tasks to today, then lock it.
     for (const previous of previousNotes) {
       const unfinished = db
         .prepare<[number, string], TaskTitleRow>(

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// TL;DR: the top of the app. It just decides which screen is showing right
+// now - the board, one open post-it, or settings - and flips between them.
 import { ref, onMounted, onUnmounted } from 'vue'
 import BoardScreen from './screens/BoardScreen.vue'
 import TodayScreen from './screens/TodayScreen.vue'
@@ -14,6 +16,7 @@ const currentScreen = ref<Screen>('board')
 // have several of them, rather than by date.
 const openedNoteId = ref<number | undefined>(undefined)
 
+// Clicked a post-it on the board? Remember which one, and show it.
 function openNote(noteId: number): void {
   openedNoteId.value = noteId
   currentScreen.value = 'today'

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// TL;DR: the settings page. Right now it does one thing: lets you pick
+// which Obsidian vault folder your task log gets written into.
 import { ref, onMounted } from 'vue'
 import type { VaultStatus } from '../../../shared/types'
 
@@ -9,6 +11,7 @@ defineEmits<{ back: [] }>()
 const vaultStatus = ref<VaultStatus | null>(null)
 const loadError = ref<string | null>(null)
 
+// Ask the backstage which folder is saved (and whether it's still there).
 async function loadVaultStatus(): Promise<void> {
   loadError.value = null
   try {
@@ -21,6 +24,7 @@ async function loadVaultStatus(): Promise<void> {
 
 onMounted(loadVaultStatus)
 
+// Pops open the normal "pick a folder" window and saves whatever you choose.
 async function chooseFolder(): Promise<void> {
   loadError.value = null
   try {

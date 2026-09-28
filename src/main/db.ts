@@ -1,3 +1,5 @@
+// TL;DR: opens the app's database file (and creates it the first time).
+//
 // Database setup for Todobee's main process. better-sqlite3 is synchronous
 // (no async/await needed) which keeps this simple for a TypeScript beginner:
 // every call here just runs and returns, no Promises involved.
