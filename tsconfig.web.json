@@ -1,5 +1,10 @@
+// Type-checker settings for the screens half of the app (renderer), which
+// runs inside the app window like a web page.
 {
+  // Start from the standard settings for this kind of Electron app.
   "extends": "@electron-toolkit/tsconfig/tsconfig.web.json",
+  // Which files this covers. The screens can also see the shared data
+  // shapes and the list of window.api requests.
   "include": [
     "src/renderer/src/env.d.ts",
     "src/renderer/src/**/*",
@@ -8,7 +13,9 @@
     "src/shared/**/*"
   ],
   "compilerOptions": {
+    // Lets this file be one "half" linked from tsconfig.json.
     "composite": true,
+    // The "@renderer/..." shortcut for "src/renderer/src/...".
     "paths": {
       "@renderer/*": [
         "./src/renderer/src/*"

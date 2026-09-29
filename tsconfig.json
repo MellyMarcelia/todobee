@@ -1,4 +1,9 @@
+// Settings for the TypeScript type checker (run with "npm run typecheck").
+// The app has two halves that run in different places, so each half has
+// its own settings file. This file just points to both.
 {
+  // No files of its own - everything is in the two files below.
   "files": [],
+  // The behind-the-scenes half, and the screens half.
   "references": [{ "path": "./tsconfig.node.json" }, { "path": "./tsconfig.web.json" }]
 }

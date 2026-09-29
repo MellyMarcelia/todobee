@@ -3,11 +3,13 @@
 @import './fonts.css';
 @import './base.css';
 
+/* No scroll bars, and dragging the mouse doesn't highlight text by accident. */
 body {
   overflow: hidden;
   user-select: none;
 }
 
+/* The box the app lives in fills the whole window exactly. */
 #app {
   height: 100vh;
   width: 100vw;

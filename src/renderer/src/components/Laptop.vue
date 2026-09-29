@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // A little laptop drawing, seen from behind. Not used anywhere right now -
 // it was taken off the desk until the desk gets redesigned.
+// "size" is how wide it is, in pixels (120 unless told otherwise).
 withDefaults(defineProps<{ size?: number }>(), { size: 120 })
 </script>
 
@@ -18,11 +19,13 @@ withDefaults(defineProps<{ size?: number }>(), { size: 120 })
 </template>
 
 <style scoped>
+/* The drawing's width comes from the "size" setting; the height follows along. */
 .laptop {
   width: v-bind('`${size}px`');
   height: auto;
 }
 
+/* The keyboard part: dark grey with a dark outline. */
 .base {
   fill: #8a9098;
   stroke: var(--color-ink);
@@ -30,6 +33,7 @@ withDefaults(defineProps<{ size?: number }>(), { size: 120 })
   stroke-linejoin: round;
 }
 
+/* The lid: a lighter grey with a dark outline. */
 .lid {
   fill: #a7adb3;
   stroke: var(--color-ink);
@@ -37,6 +41,7 @@ withDefaults(defineProps<{ size?: number }>(), { size: 120 })
   stroke-linejoin: round;
 }
 
+/* The shiny edge: the lightest grey. */
 .rim {
   fill: #c7ccd1;
 }

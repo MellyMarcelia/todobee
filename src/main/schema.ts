@@ -4,8 +4,16 @@
 // app so they match the current layout.
 import type Database from 'better-sqlite3'
 
+// Runs every time the app opens. It's safe to repeat: anything that's
+// already set up is simply left as it is.
 export function createSchema(db: Database.Database): void {
   // Create the three tables, but only if they don't exist yet.
+  //  - notes: one row per post-it (its day, name, colour, whether it's
+  //    locked, whether it got the "good job" stamp, and where it sits on
+  //    the board).
+  //  - tasks: one row per task, plus which post-it it's on, and whether
+  //    it's "open" (to do) or "done". Nothing else is allowed.
+  //  - settings: named values, like which Obsidian folder you picked.
   db.exec(`
     CREATE TABLE IF NOT EXISTS notes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -35,6 +43,7 @@ export function createSchema(db: Database.Database): void {
 
   // Older database files may be missing some columns that were added
   // later. Check for each one and add it if it isn't there.
+  // First get the list of columns the post-its table has right now.
   const columns = db.prepare('PRAGMA table_info(notes)').all() as { name: string }[]
   const hasSealed = columns.some((column) => column.name === 'sealed')
   if (!hasSealed) {
@@ -65,6 +74,8 @@ export function createSchema(db: Database.Database): void {
   //   3. throw away the old table and give the new one its name.
   // The "every task needs a real post-it" check is paused while this
   // happens, otherwise it would complain when the old table is removed.
+  // Look for that old "one per day" rule. If it's not there, there's
+  // nothing to do.
   const indexes = db.prepare('PRAGMA index_list(notes)').all() as {
     name: string
     unique: number

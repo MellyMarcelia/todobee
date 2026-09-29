@@ -4,16 +4,24 @@ import { createSchema } from '../schema'
 import { runLaunchRollover } from '../rollover'
 import { DEFAULT_NOTE_TITLE, DEFAULT_NOTE_COLOUR } from '../../shared/types'
 
-// Seam under test: runLaunchRollover(db, todayDate) - a pure function over a
-// better-sqlite3 Database, so these tests run against a real in-memory
-// database instead of mocking SQL. No Electron involved.
+// Automatic checks for the "new day" step (rollover.ts): carrying
+// unfinished tasks over to today, locking old post-its, and making the
+// default post-it. Run them with "npm test".
+//
+// Each test pretends it's a certain date by passing that date in, so we
+// can "time travel" between days without waiting. The tests never touch
+// your real saved data: each one uses a fresh, throwaway database that
+// only exists in memory while the test runs.
 
+// Makes a fresh, empty throwaway database with all the tables set up.
 function makeDb(): Database.Database {
   const db = new Database(':memory:')
   createSchema(db)
   return db
 }
 
+// Quickly adds a post-it (default name and colour, unlocked, unless told
+// otherwise), and gives back its id number.
 function insertNote(
   db: Database.Database,
   noteDate: string,
@@ -26,6 +34,7 @@ function insertNote(
     .run(noteDate, title, colour, sealed).lastInsertRowid as number
 }
 
+// Quickly adds a task to a post-it (not done, unless told otherwise).
 function insertTask(
   db: Database.Database,
   noteId: number,
@@ -39,12 +48,14 @@ function insertTask(
   )
 }
 
+// Lists the tasks (name and done/not done) on a post-it, oldest first.
 function tasksOnNote(db: Database.Database, noteId: number): { title: string; status: string }[] {
   return db
     .prepare('SELECT title, status FROM tasks WHERE note_id = ? ORDER BY id ASC')
     .all(noteId) as { title: string; status: string }[]
 }
 
+// Lists the post-its (id and name) on a given day.
 function notesForDate(db: Database.Database, noteDate: string): { id: number; title: string }[] {
   return db
     .prepare('SELECT id, title FROM notes WHERE note_date = ? ORDER BY id ASC')
@@ -54,6 +65,7 @@ function notesForDate(db: Database.Database, noteDate: string): { id: number; ti
 describe('runLaunchRollover', () => {
   let db: Database.Database
 
+  // Before every test: start again with a brand-new empty database.
   beforeEach(() => {
     db = makeDb()
   })
@@ -193,8 +205,9 @@ describe('runLaunchRollover', () => {
   })
 
   it('still rolls over when the new day already has a post-it from an earlier visit', () => {
-    // Dev "next day" button visited 09-28 and left a sealed note there, then
-    // the app restarted back on 09-27 and a new post-it got a task.
+    // The situation: while testing, someone jumped ahead to the 28th, which
+    // left a locked post-it there. Then the app went back to the 27th, and
+    // a task was added to a new post-it. Now the real 28th arrives.
     const staleFuture = insertNote(db, '2026-09-28', DEFAULT_NOTE_TITLE, DEFAULT_NOTE_COLOUR, 1)
     const school = insertNote(db, '2026-09-27', 'School', '#7FB069')
     insertTask(db, school, 'Finish assignments', 'open')

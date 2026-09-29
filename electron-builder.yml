@@ -1,7 +1,15 @@
+# Settings for packaging the app into something you can install
+# (a .dmg on Mac, a setup .exe on Windows, and so on).
+# Used by "npm run build:mac", "build:win" and "build:linux".
+
+# The app's unique id, and the name people see.
 appId: com.todobee.app
 productName: Todobee
+# Where the extra packaging files live (icons, Mac permissions...).
 directories:
   buildResources: build
+# Files to leave OUT of the finished app. It only needs the built code,
+# not the source files, settings files or notes.
 files:
   - '!**/.vscode/*'
   - '!src/*'
@@ -9,9 +17,12 @@ files:
   - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+# Keep these as normal files (not squashed into the app bundle), because
+# they need to be read directly. The database tool is one of them.
 asarUnpack:
   - resources/**
   - node_modules/better-sqlite3/**
+# Windows: the program's name, and the installer's file name and shortcuts.
 win:
   executableName: Todobee
 nsis:
@@ -19,13 +30,18 @@ nsis:
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
+# Mac: which permissions the app asks for, and the message shown when it
+# asks to use your Documents folder. It isn't signed with an Apple
+# developer account ("notarize: false").
 mac:
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
     - NSDocumentsFolderUsageDescription: Todobee writes your task log into the Obsidian vault folder you choose, which may be inside Documents.
   notarize: false
+# The Mac .dmg file's name.
 dmg:
   artifactName: ${name}-${version}.${ext}
+# Linux: which kinds of installer to make, and where it shows up in the app menu.
 linux:
   target:
     - AppImage
@@ -35,4 +51,5 @@ linux:
   category: Utility
 appImage:
   artifactName: ${name}-${version}.${ext}
+# Don't rebuild the downloaded tools while packaging (already done on install).
 npmRebuild: false

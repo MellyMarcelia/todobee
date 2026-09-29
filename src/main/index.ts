@@ -3,6 +3,9 @@
 // "delete this post-it"...). The actual saving and loading happens in the
 // *Repo.ts files - this file connects the dots and writes each change to
 // your Obsidian log.
+
+// Bring in the tools this file needs: Electron's window/menu/dialog pieces,
+// plus our own helpers for the database, the log, dates, post-its and tasks.
 import { app, shell, BrowserWindow, ipcMain, dialog, Menu } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -54,6 +57,7 @@ function logTaskEvent(event: TaskEvent): void {
  * writes a "moved from <date>" line in the log for each task that moved.
  */
 function rolloverAndLog(dateString: string): ReturnType<typeof runLaunchRollover> {
+  // Do the actual carrying-over, then log each task that moved.
   const result = runLaunchRollover(getDb(), dateString)
   for (const moved of result.movedTasks) {
     logTaskEvent({
@@ -74,6 +78,7 @@ function rolloverAndLog(dateString: string): ReturnType<typeof runLaunchRollover
 function ensureTodayNoteFor(title: string, colour: string): ReturnType<typeof createNote> {
   const db = getDb()
   const todayDate = todayDateString()
+  // Look through today's post-its for one with the same name and colour.
   const existing = listNotesForDate(db, todayDate).find(
     (note) => note.title === title && note.colour === colour
   )
@@ -84,16 +89,22 @@ function ensureTodayNoteFor(title: string, colour: string): ReturnType<typeof cr
 // Makes the app window (small, like a phone screen) and loads the screens into it.
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
+    // Starting size, and the smallest you're allowed to shrink it to.
     width: 440,
     height: 680,
     minWidth: 380,
     minHeight: 580,
     resizable: true,
+    // Stay hidden until it's ready (see "ready-to-show" below).
     show: false,
     autoHideMenuBar: true,
+    // The cream background colour, shown while the screens are loading.
     backgroundColor: '#FDF3DC',
+    // On Linux the window needs its icon set by hand.
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
+      // Load the "messenger" file (preload/index.ts) so the screens can
+      // talk to this part of the app.
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false
     }
@@ -216,11 +227,14 @@ app.whenReady().then(() => {
   // (0 = today, -1 = yesterday, 1 = tomorrow). When loading today, we first
   // carry over yesterday's unfinished tasks so they show up right away.
   ipcMain.handle('notes:getForDay', (_event, dayOffset: number) => {
+    // Work out the actual date we're looking at (today + the offset).
     const today = parseDateString(todayDateString())
     const date = addDays(today, dayOffset)
     const dateString = formatDateString(date)
     if (dayOffset === 0) rolloverAndLog(dateString)
     const notes = listNotesForDate(getDb(), dateString)
+    // Send back the post-its, the pretty date label, and whether this day
+    // is today or in the past (so the board knows what to lock).
     return {
       notes,
       dateLabel: formatLongDate(date),
@@ -239,6 +253,7 @@ app.whenReady().then(() => {
   // for past days, since those are locked.
   ipcMain.handle('notes:create', (_event, title: string, colour: string, dayOffset: number) => {
     if (dayOffset < 0) throw new Error('Cannot add a post-it to a past day.')
+    // Turn "days from today" into a real date, then make the post-it there.
     const dateString = formatDateString(addDays(parseDateString(todayDateString()), dayOffset))
     return createNote(getDb(), dateString, title, colour)
   })
@@ -251,6 +266,7 @@ app.whenReady().then(() => {
   // nothing disappears without a trace.
   ipcMain.handle('notes:delete', (_event, noteId: number) => {
     const note = getNoteById(getDb(), noteId)
+    // Already gone? Nothing to do. Locked? Refuse.
     if (!note) return
     if (note.sealed) throw new Error(`"${note.title}" is read-only history and can't be deleted.`)
     const deletedTasks = deleteNote(getDb(), noteId)
@@ -270,8 +286,10 @@ app.whenReady().then(() => {
   // "moved to <tomorrow>" line in the log.
   ipcMain.handle('notes:moveOpenTasksToNextDay', (_event, noteId: number) => {
     const note = getNoteById(getDb(), noteId)
+    // Stop right away if the post-it doesn't exist or is locked.
     if (!note) throw new Error(`No post-it found (id ${noteId}).`)
     if (note.sealed) throw new Error(`"${note.title}" is read-only history.`)
+    // Work out tomorrow's date, then move the unfinished tasks there.
     const tomorrow = formatDateString(addDays(parseDateString(todayDateString()), 1))
     const { movedTitles } = moveOpenTasksToDate(getDb(), noteId, tomorrow)
     for (const title of movedTitles) {
@@ -283,6 +301,7 @@ app.whenReady().then(() => {
         movedTo: tomorrow
       })
     }
+    // Tell the screen how many moved, for the "2 tasks moved" message.
     return movedTitles.length
   })
 
@@ -290,14 +309,18 @@ app.whenReady().then(() => {
   // move it to today". Put it on today's post-it with the same name and
   // colour (making one if needed), mark it not done, and log it.
   ipcMain.handle('tasks:moveToToday', (_event, taskId: number) => {
+    // Find the task and the old post-it it's sitting on.
     const sourceTask = getTaskById(taskId)
     const sourceNote = sourceTask ? getNoteById(getDb(), sourceTask.noteId) : null
+    // Make sure today is fully set up first (carry-over done, default
+    // post-it made), so we don't end up with two matching post-its.
     rolloverAndLog(todayDateString())
     const targetNote = ensureTodayNoteFor(
       sourceNote?.title ?? DEFAULT_NOTE_TITLE,
       sourceNote?.colour ?? DEFAULT_NOTE_COLOUR
     )
     const moved = moveTaskToNote(taskId, targetNote.id)
+    // Both post-its changed, so re-check the "good job" stamp on each.
     if (sourceTask) recalculatePerfectDay(getDb(), sourceTask.noteId)
     recalculatePerfectDay(getDb(), targetNote.id)
     logTaskEvent({
@@ -316,6 +339,8 @@ app.whenReady().then(() => {
   // If you press Cancel, nothing changes.
   ipcMain.handle('vault:getStatus', () => getVaultStatus(getDb()))
   ipcMain.handle('vault:chooseFolder', async () => {
+    // Attach the folder picker to our window if we can (so it pops up on
+    // top of it). You can pick an existing folder or make a new one.
     const mainWindow = BrowserWindow.getFocusedWindow()
     const result = mainWindow
       ? await dialog.showOpenDialog(mainWindow, {
@@ -323,6 +348,7 @@ app.whenReady().then(() => {
         })
       : await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] })
     if (result.canceled || result.filePaths.length === 0) return null
+    // Save the folder you picked, and send back its new status.
     const chosenPath = result.filePaths[0]
     setVaultPath(getDb(), chosenPath)
     return getVaultStatus(getDb())

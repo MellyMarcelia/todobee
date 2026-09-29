@@ -18,6 +18,7 @@ interface NoteRow {
   created_at: string
 }
 
+// Same as above, plus how many tasks are on the post-it.
 interface NoteRowWithTaskCount extends NoteRow {
   task_count: number
 }
@@ -45,6 +46,8 @@ function toBoardNote(row: NoteRowWithTaskCount): BoardNote {
 
 /** Every post-it on one day, oldest first, each with its number of tasks. */
 export function listNotesForDate(db: Database.Database, noteDate: string): BoardNote[] {
+  // Grab that day's post-its, and count the tasks on each one at the same
+  // time. A post-it with no tasks still shows up (with a count of 0).
   const rows = db
     .prepare<[string], NoteRowWithTaskCount>(
       `SELECT notes.*, COUNT(tasks.id) AS task_count
@@ -74,6 +77,7 @@ export function createNote(
   const result = db
     .prepare('INSERT INTO notes (note_date, title, colour) VALUES (?, ?, ?)')
     .run(noteDate, title, colour)
+  // Read the new post-it back, using the id number the database just gave it.
   return getNoteById(db, result.lastInsertRowid as number)!
 }
 
@@ -88,6 +92,7 @@ export function setNotePosition(db: Database.Database, noteId: number, x: number
   db.prepare('UPDATE notes SET board_x = ?, board_y = ? WHERE id = ?').run(x, y, noteId)
 }
 
+// The bits of a task we need to remember before deleting it (for the log).
 interface DeletedTaskRow {
   title: string
   status: string
@@ -102,16 +107,21 @@ export function deleteNote(
   db: Database.Database,
   noteId: number
 ): { title: string; status: 'open' | 'done' }[] {
+  // "transaction" is what makes it all-or-nothing.
   const remove = db.transaction(() => {
+    // 1. Note down the tasks first, so we can still log them afterwards.
     const tasks = db
       .prepare<[number], DeletedTaskRow>(
         'SELECT title, status FROM tasks WHERE note_id = ? ORDER BY created_at ASC, id ASC'
       )
       .all(noteId)
+    // 2. Delete the tasks, then 3. the post-it itself. (Tasks go first,
+    //    because a task isn't allowed to point at a post-it that's gone.)
     db.prepare('DELETE FROM tasks WHERE note_id = ?').run(noteId)
     db.prepare('DELETE FROM notes WHERE id = ?').run(noteId)
     return tasks
   })
+  // Run it, and tidy up each task's status so it's always "open" or "done".
   return remove().map((task) => ({
     title: task.title,
     status: task.status === 'done' ? ('done' as const) : ('open' as const)
@@ -133,10 +143,14 @@ export function moveOpenTasksToDate(
   noteId: number,
   targetDate: string
 ): { target: Note; movedTitles: string[] } {
+  // All-or-nothing again: either every step below works, or nothing changes.
   const move = db.transaction(() => {
+    // The post-it we're moving tasks away from.
     const source = db.prepare<[number], NoteRow>('SELECT * FROM notes WHERE id = ?').get(noteId)
     if (!source) throw new Error(`No post-it found (id ${noteId}).`)
 
+    // Is there already a matching post-it (same name and colour) on the
+    // target day? Use it. If not, make one in the same spot on the board.
     const existing = db
       .prepare<[string, string, string], NoteRow>(
         'SELECT * FROM notes WHERE note_date = ? AND title = ? AND colour = ? ORDER BY id ASC'
@@ -151,6 +165,8 @@ export function moveOpenTasksToDate(
         .run(targetDate, source.title, source.colour, source.board_x, source.board_y)
         .lastInsertRowid as number)
 
+    // Note down the names of the unfinished tasks (for the log), then move
+    // them all over in one go.
     const movedTitles = db
       .prepare<[number], { title: string }>(
         "SELECT title FROM tasks WHERE note_id = ? AND status = 'open' ORDER BY created_at ASC, id ASC"
@@ -162,11 +178,13 @@ export function moveOpenTasksToDate(
       noteId
     )
 
+    // Both post-its just changed, so re-check the "good job" stamp on each.
     recalculatePerfectDay(db, noteId)
     recalculatePerfectDay(db, targetId)
     return { targetId, movedTitles }
   })
 
+  // Do it all, then hand back the target post-it in its latest state.
   const { targetId, movedTitles } = move()
   return { target: getNoteById(db, targetId)!, movedTitles }
 }

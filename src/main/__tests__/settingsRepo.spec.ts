@@ -1,8 +1,17 @@
+// Automatic checks for saving the Obsidian folder you picked, and for
+// checking whether it still exists (settingsRepo.ts). Run them with
+// "npm test".
+//
+// These tests never touch your real saved data. Each one uses a fresh,
+// throwaway database that only exists in memory while the test runs.
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import Database from 'better-sqlite3'
 import { createSchema } from '../schema'
 import { getVaultPath, setVaultPath, getVaultStatus } from '../settingsRepo'
 
+// Swap out the real "does this folder exist on the computer?" check for a
+// pretend one. Each test decides what it answers, so we don't need real
+// folders on disk.
 vi.mock('fs', () => {
   const existsSync = vi.fn()
   return { existsSync, default: { existsSync } }
@@ -11,6 +20,8 @@ vi.mock('fs', () => {
 describe('settingsRepo', () => {
   let db: Database.Database
 
+  // Before every test: start again with a brand-new empty database, and
+  // reset the pretend folder check.
   beforeEach(() => {
     db = new Database(':memory:')
     createSchema(db)

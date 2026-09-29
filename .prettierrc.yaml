@@ -1,3 +1,9 @@
+# Settings for Prettier, the tool that tidies up how code looks
+# (run with "npm run format").
+#   singleQuote: use 'single' quotes instead of "double" ones
+#   semi: don't put a ; at the end of lines
+#   printWidth: wrap lines longer than 100 characters
+#   trailingComma: no extra comma after the last item in a list
 singleQuote: true
 semi: false
 printWidth: 100

@@ -1,14 +1,18 @@
+// Automatic checks for the Obsidian task log (obsidianLogger.ts): how each
+// line is worded, which file it goes into, and that writing it can never
+// break the app. Run them with "npm test".
 import { describe, it, expect, afterEach } from 'vitest'
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { formatTimestamp, formatLogLine, logFilePath, appendTaskEvent } from '../obsidianLogger'
 
-// Fixed instant: 2026-09-27T17:30:12.000Z is 19:30:12 in Europe/Brussels
-// (UTC+02:00, daylight saving in effect in September) - matches the exact
-// example line from the milestone spec.
+// Every test uses this same moment in time, so the answers are always the
+// same. 17:30:12 world time (UTC) on 27 Sep 2026 is 19:30:12 in Brussels
+// (2 hours ahead in summer). It matches the example line from the plan.
 const FIXED_INSTANT = new Date('2026-09-27T17:30:12.000Z')
 
+// The date and time at the start of each line, in different time zones.
 describe('formatTimestamp', () => {
   it('formats date, time, and timezone name + UTC offset together', () => {
     expect(formatTimestamp(FIXED_INSTANT, 'Europe/Brussels')).toBe(
@@ -24,6 +28,7 @@ describe('formatTimestamp', () => {
   })
 })
 
+// The full wording of one log line.
 describe('formatLogLine', () => {
   it('starts with a markdown bullet ("- ")', () => {
     const line = formatLogLine(
@@ -80,6 +85,7 @@ describe('formatLogLine', () => {
   })
 })
 
+// Which file (and folders) a line goes into.
 describe('logFilePath', () => {
   it('builds <vault>/Todobee/Tasks/YYYY/YYYY-MM/YYYY-MM-DD.md from the local date', () => {
     const path = logFilePath('/vault', FIXED_INSTANT, 'Europe/Brussels')
@@ -94,9 +100,12 @@ describe('logFilePath', () => {
   })
 })
 
+// Actually writing lines to a file. These tests make a pretend vault in
+// the computer's temporary folder, so your real vault is never touched.
 describe('appendTaskEvent', () => {
   let vaultDir: string
 
+  // After every test: throw the pretend vault away.
   afterEach(() => {
     if (vaultDir) rmSync(vaultDir, { recursive: true, force: true })
   })

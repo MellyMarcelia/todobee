@@ -1,3 +1,9 @@
+// Automatic checks for everything you can do to a whole post-it
+// (notesRepo.ts): list, find, create, rename, drag, delete, and "move this
+// to the next day". Run them with "npm test".
+//
+// These tests never touch your real saved data. Each one uses a fresh,
+// throwaway database that only exists in memory while the test runs.
 import { describe, it, expect, beforeEach } from 'vitest'
 import Database from 'better-sqlite3'
 import { createSchema } from '../schema'
@@ -12,12 +18,15 @@ import {
 } from '../notesRepo'
 import { runLaunchRollover } from '../rollover'
 
+// Makes a fresh, empty throwaway database with all the tables set up.
 function makeDb(): Database.Database {
   const db = new Database(':memory:')
   createSchema(db)
   return db
 }
 
+// Quickly adds a post-it (default name and colour unless told otherwise),
+// and gives back its id number.
 function insertNote(
   db: Database.Database,
   noteDate: string,
@@ -30,6 +39,7 @@ function insertNote(
   return result.lastInsertRowid as number
 }
 
+// Quickly adds a task called "a task" to a post-it (not done, unless told otherwise).
 function insertTask(db: Database.Database, noteId: number, status: 'open' | 'done' = 'open'): void {
   db.prepare('INSERT INTO tasks (note_id, title, status) VALUES (?, ?, ?)').run(
     noteId,
@@ -38,9 +48,11 @@ function insertTask(db: Database.Database, noteId: number, status: 'open' | 'don
   )
 }
 
+// Loading all the post-its for one day, with their task counts.
 describe('listNotesForDate', () => {
   let db: Database.Database
 
+  // Before every test: start again with a brand-new empty database.
   beforeEach(() => {
     db = makeDb()
   })
@@ -88,9 +100,11 @@ describe('listNotesForDate', () => {
   })
 })
 
+// Finding one post-it by its id number.
 describe('getNoteById', () => {
   let db: Database.Database
 
+  // Before every test: start again with a brand-new empty database.
   beforeEach(() => {
     db = makeDb()
   })
@@ -107,9 +121,11 @@ describe('getNoteById', () => {
   })
 })
 
+// Making a new post-it.
 describe('createNote', () => {
   let db: Database.Database
 
+  // Before every test: start again with a brand-new empty database.
   beforeEach(() => {
     db = makeDb()
   })
@@ -131,9 +147,11 @@ describe('createNote', () => {
   })
 })
 
+// Renaming a post-it.
 describe('updateNoteTitle', () => {
   let db: Database.Database
 
+  // Before every test: start again with a brand-new empty database.
   beforeEach(() => {
     db = makeDb()
   })
@@ -145,9 +163,11 @@ describe('updateNoteTitle', () => {
   })
 })
 
+// Remembering where a post-it was dragged on the board.
 describe('setNotePosition', () => {
   let db: Database.Database
 
+  // Before every test: start again with a brand-new empty database.
   beforeEach(() => {
     db = makeDb()
   })
@@ -169,9 +189,11 @@ describe('setNotePosition', () => {
   })
 })
 
+// Deleting a post-it and its tasks.
 describe('deleteNote', () => {
   let db: Database.Database
 
+  // Before every test: start again with a brand-new empty database.
   beforeEach(() => {
     db = makeDb()
   })
@@ -216,15 +238,18 @@ describe('deleteNote', () => {
   })
 })
 
+// The "move this to the next day" button.
 describe('moveOpenTasksToDate', () => {
   let db: Database.Database
 
+  // Lists the tasks (name and done/not done) on a post-it, oldest first.
   function tasksOn(noteId: number): { title: string; status: string }[] {
     return db
       .prepare('SELECT title, status FROM tasks WHERE note_id = ? ORDER BY id ASC')
       .all(noteId) as { title: string; status: string }[]
   }
 
+  // Quickly adds a task with a name and status you choose.
   function insertNamedTask(noteId: number, title: string, status: 'open' | 'done'): void {
     db.prepare('INSERT INTO tasks (note_id, title, status) VALUES (?, ?, ?)').run(
       noteId,
@@ -233,6 +258,7 @@ describe('moveOpenTasksToDate', () => {
     )
   }
 
+  // Before every test: start again with a brand-new empty database.
   beforeEach(() => {
     db = makeDb()
   })

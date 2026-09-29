@@ -4,8 +4,11 @@ import type Database from 'better-sqlite3'
 import { existsSync } from 'fs'
 import type { VaultStatus } from '../shared/types'
 
+// The settings table works like a labelled drawer: each setting has a
+// name (the "key") and a value. This is the name we store the folder under.
 const VAULT_PATH_KEY = 'vaultPath'
 
+// One setting, as the database hands it back to us.
 interface SettingRow {
   value: string | null
 }

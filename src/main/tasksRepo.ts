@@ -45,10 +45,12 @@ export function getTaskById(taskId: number): Task | null {
 // Adds a new task, then reads it back to get the id number and time the database gave it.
 export function createTask(noteId: number, input: NewTask): Task {
   const db = getDb()
+  // Save the new task on the right post-it. It starts as "open" (not done).
   const result = db
     .prepare('INSERT INTO tasks (note_id, title) VALUES (?, ?)')
     .run(noteId, input.title)
 
+  // Read the full task back, using the id number the database just gave it.
   const created = db
     .prepare<[number], TaskRow>('SELECT * FROM tasks WHERE id = ?')
     .get(result.lastInsertRowid as number)!
@@ -61,6 +63,7 @@ export function updateTaskTitle(taskId: number, title: string): Task {
   const db = getDb()
   db.prepare('UPDATE tasks SET title = ? WHERE id = ?').run(title, taskId)
 
+  // Read it back so the screen gets the task exactly as it's now saved.
   const updated = db.prepare<[number], TaskRow>('SELECT * FROM tasks WHERE id = ?').get(taskId)!
   return toTask(updated)
 }
@@ -70,6 +73,7 @@ export function setTaskStatus(taskId: number, status: 'open' | 'done'): Task {
   const db = getDb()
   db.prepare('UPDATE tasks SET status = ? WHERE id = ?').run(status, taskId)
 
+  // Read it back so the screen gets the task exactly as it's now saved.
   const updated = db.prepare<[number], TaskRow>('SELECT * FROM tasks WHERE id = ?').get(taskId)!
   return toTask(updated)
 }

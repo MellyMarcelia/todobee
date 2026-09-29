@@ -4,12 +4,15 @@
 import { computed } from 'vue'
 import beeIdle from '../assets/bee/bee-idle.gif'
 
+// The bee's moods: "idle" (just hanging out) or "happy" (celebrating).
 type Mood = 'idle' | 'happy'
 
+// The settings you can give the bee, and what they are if you don't.
 const props = withDefaults(
   defineProps<{
     /** How big the bee is, in pixels. The bee is never stretched. */
     size?: number
+    /** "idle" or "happy" (does a little wiggle). */
     mood?: Mood
     /** Gentle up-and-down movement. Off unless asked for. */
     bob?: boolean
@@ -39,13 +42,17 @@ const BEE_CENTER_Y = 262
 const BEE_CONTENT_HEIGHT = 176 // how tall the bee itself is
 const FILL_FRACTION = 0.92 // the bee should fill 92% of the box's height
 
+// How much to zoom the picture so the bee fills the box nicely.
 const scale = computed(() => (props.size * FILL_FRACTION) / BEE_CONTENT_HEIGHT)
 
+// How big the whole zoomed picture ends up.
 const backgroundSize = computed(() => {
   const px = SOURCE_SIZE * scale.value
   return `${px}px ${px}px`
 })
 
+// Slides the zoomed picture so the middle of the bee lands in the middle
+// of the box.
 const backgroundPosition = computed(() => {
   const x = props.size / 2 - BEE_CENTER_X * scale.value
   const y = props.size / 2 - BEE_CENTER_Y * scale.value
@@ -54,6 +61,8 @@ const backgroundPosition = computed(() => {
 </script>
 
 <template>
+  <!-- A square box with the bee picture as its background, zoomed and
+       centred using the numbers worked out above. -->
   <div
     class="bee-mascot"
     :class="{ 'bee-bob': bob, 'bee-happy': mood === 'happy' }"
@@ -70,6 +79,8 @@ const backgroundPosition = computed(() => {
 </template>
 
 <style scoped>
+/* The bee's box. The picture is drawn once (not tiled); its size and position come from the
+   script above. */
 .bee-mascot {
   display: block;
   background-repeat: no-repeat;
@@ -77,6 +88,7 @@ const backgroundPosition = computed(() => {
 
 /* Animations only play if your computer isn't set to "reduce motion". */
 @media (prefers-reduced-motion: no-preference) {
+  /* The gentle bob: up and down, forever, 0.6 seconds each time. */
   .bee-bob {
     animation: bee-typing-bob 0.6s ease-in-out infinite;
   }
@@ -89,6 +101,7 @@ const backgroundPosition = computed(() => {
   }
 }
 
+/* The bob movement: start, float up 3 pixels halfway, then back down. */
 @keyframes bee-typing-bob {
   0%,
   100% {
@@ -99,6 +112,8 @@ const backgroundPosition = computed(() => {
   }
 }
 
+/* The happy wiggle: two hops with a tilt and a little grow, each smaller than the last, then
+   back to normal. */
 @keyframes bee-celebrate {
   0% {
     transform: translateY(0) rotate(0deg) scale(1);

@@ -1,9 +1,15 @@
 <!doctype html>
+<!-- The single web page the whole app is drawn on. It's almost empty on
+     purpose: the screens get drawn into the "app" box below. -->
 <html>
   <head>
+    <!-- Lets the page show any language's letters and emoji correctly. -->
     <meta charset="UTF-8" />
+    <!-- The name shown in the window's title bar. -->
     <title>Todobee</title>
-    <!-- https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP -->
+    <!-- A safety rule: the page may only load code, styles and pictures
+         that come with the app itself - nothing from the internet.
+         More info: https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP -->
     <meta
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
@@ -11,7 +17,9 @@
   </head>
 
   <body>
+    <!-- The empty box the app gets drawn into. -->
     <div id="app"></div>
+    <!-- Starts the app (see src/main.ts). -->
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

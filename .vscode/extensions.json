@@ -1,3 +1,5 @@
+// When you open this project in VS Code, it suggests installing these
+// add-ons. ESLint shows the code checker's warnings right in the editor.
 {
   "recommendations": ["dbaeumer.vscode-eslint"]
 }

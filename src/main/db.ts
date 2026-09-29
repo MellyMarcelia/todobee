@@ -16,8 +16,12 @@ let db: Database.Database | null = null
 export function getDb(): Database.Database {
   if (db) return db
 
+  // The file lives in the app's own private folder on your computer
+  // (on a Mac: ~/Library/Application Support/todobee).
   const dbPath = join(app.getPath('userData'), 'todobee.db')
   db = new Database(dbPath)
+  // A faster, safer way of saving. If the app crashes mid-save, your data
+  // doesn't get scrambled.
   db.pragma('journal_mode = WAL')
   // Makes the database enforce that every task belongs to a post-it that
   // really exists. It's off by default, so we have to switch it on.

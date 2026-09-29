@@ -39,6 +39,7 @@ function toNote(row: NoteRow): Note {
   }
 }
 
+// Just a task's name, as the database hands it back.
 interface TaskTitleRow {
   title: string
 }
@@ -66,11 +67,14 @@ export interface RolloverResult {
  * you planned ahead). Otherwise yesterday's unfinished tasks could get stuck.
  */
 export function runLaunchRollover(db: Database.Database, todayDate: string): RolloverResult {
+  // Everything inside here is all-or-nothing: if one step fails, none of
+  // the changes are kept, so you never end up with half-moved tasks.
   const rollover = db.transaction((): { notes: NoteRow[]; movedTasks: MovedTask[] } => {
     // Today's post-its should never be locked. If one somehow is (this can
     // happen after testing with a fake date), unlock it.
     db.prepare('UPDATE notes SET sealed = 0 WHERE note_date = ? AND sealed = 1').run(todayDate)
 
+    // Today's post-its that already exist (e.g. ones you made earlier today).
     const todayNotes = db
       .prepare<[string], NoteRow>(
         'SELECT * FROM notes WHERE note_date = ? ORDER BY created_at ASC, id ASC'
@@ -87,6 +91,7 @@ export function runLaunchRollover(db: Database.Database, todayDate: string): Rol
       )
       .all(todayDate)
 
+    // A running list of every task we carry over, so it can be logged later.
     const movedTasks: MovedTask[] = []
 
     // Finds today's post-it with this name and colour, or makes one. A new
@@ -114,6 +119,7 @@ export function runLaunchRollover(db: Database.Database, todayDate: string): Rol
 
     // For each older post-it: move its unfinished tasks to today, then lock it.
     for (const previous of previousNotes) {
+      // The tasks on this old post-it that were never ticked off.
       const unfinished = db
         .prepare<[number, string], TaskTitleRow>(
           'SELECT title FROM tasks WHERE note_id = ? AND status = ?'
@@ -121,12 +127,14 @@ export function runLaunchRollover(db: Database.Database, todayDate: string): Rol
         .all(previous.id, 'open')
 
       if (unfinished.length > 0) {
+        // Get (or make) the matching post-it for today.
         const target = ensureTodayNote(
           previous.title,
           previous.colour,
           previous.board_x,
           previous.board_y
         )
+        // Remember each one for the log...
         for (const row of unfinished) {
           movedTasks.push({
             title: row.title,
@@ -134,6 +142,7 @@ export function runLaunchRollover(db: Database.Database, todayDate: string): Rol
             noteTitle: previous.title
           })
         }
+        // ...then move them all onto today's post-it in one go.
         db.prepare('UPDATE tasks SET note_id = ? WHERE note_id = ? AND status = ?').run(
           target.id,
           previous.id,
@@ -155,6 +164,7 @@ export function runLaunchRollover(db: Database.Database, todayDate: string): Rol
     return { notes: todayNotes, movedTasks }
   })
 
+  // Actually run all the steps above.
   const { notes, movedTasks } = rollover()
   // Load today's post-its again so we hand back their latest state.
   const fresh = notes.map((note) =>

@@ -36,6 +36,8 @@ function partsInTimeZone(
   date: Date,
   timeZone: string
 ): { year: string; month: string; day: string; hour: string; minute: string; second: string } {
+  // Ask the computer's built-in date tool to read the clock in that time
+  // zone, as numbers (e.g. "2026", "09", "27", "14"...).
   const formatter = new Intl.DateTimeFormat('en-CA', {
     timeZone,
     year: 'numeric',
@@ -46,6 +48,7 @@ function partsInTimeZone(
     second: '2-digit',
     hour12: false
   })
+  // Turn its answer into an easy lookup: parts.year, parts.month, and so on.
   const parts = Object.fromEntries(formatter.formatToParts(date).map((p) => [p.type, p.value]))
   // Some computers write midnight as "24" instead of "00" - fix that.
   const hour = parts.hour === '24' ? '00' : parts.hour
@@ -61,6 +64,7 @@ function partsInTimeZone(
 
 /** How many hours a time zone is ahead of or behind world time (UTC), e.g. "+02:00". */
 function utcOffset(date: Date, timeZone: string): string {
+  // Ask the computer how far this time zone is from world time.
   const formatter = new Intl.DateTimeFormat('en-US', {
     timeZone,
     timeZoneName: 'shortOffset'
@@ -86,7 +90,9 @@ export function formatTimestamp(date: Date, timeZone: string): string {
 /** Builds one full log line (a bullet point) describing a task change. */
 export function formatLogLine(event: TaskEvent, date: Date, timeZone: string): string {
   const timestamp = formatTimestamp(date, timeZone)
+  // The basic line: when, what happened, done or not, the task, and its post-it.
   let line = `- **${timestamp}** - \`${event.type}\` - Status: ${event.status} - "${event.title}" - Note: "${event.noteTitle}"`
+  // Add the "moved from/to" part only if the task was moved.
   if (event.movedFrom) line += ` - moved from ${event.movedFrom}`
   if (event.movedTo) line += ` - moved to ${event.movedTo}`
   return line
@@ -129,6 +135,8 @@ export function appendTaskEvent(
   if (!existsSync(vaultPath)) return
 
   try {
+    // Work out today's file, make its folders if they're missing, then add
+    // the line to the very end of the file.
     const filePath = logFilePath(vaultPath, date, timeZone)
     mkdirSync(dirname(filePath), { recursive: true })
     appendFileSync(filePath, formatLogLine(event, date, timeZone) + '\n', 'utf-8')

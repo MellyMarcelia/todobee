@@ -17,17 +17,22 @@ export function formatDateString(date: Date): string {
 
 /** The opposite: turns text like "2026-09-27" back into a date. */
 export function parseDateString(dateString: string): Date {
+  // Split "2026-09-27" into 2026, 9 and 27.
   const [year, month, day] = dateString.split('-').map(Number)
+  // Computers count months from 0 (January = 0), hence the "- 1".
   return new Date(year, month - 1, day)
 }
 
 /** Moves a date forward by some number of days (a negative number goes back). */
 export function addDays(date: Date, days: number): Date {
+  // Make a copy first, so the date we were given isn't changed by accident.
   const result = new Date(date)
   result.setDate(result.getDate() + days)
   return result
 }
 
+// Short names for the months and weekdays, used in the label below. They're
+// in the same order the computer counts them (January and Sunday come first).
 const SHORT_MONTH_NAMES = [
   'Jan',
   'Feb',

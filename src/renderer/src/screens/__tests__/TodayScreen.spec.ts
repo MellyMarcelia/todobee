@@ -3,20 +3,24 @@ import { mount } from '@vue/test-utils'
 import TodayScreen from '../TodayScreen.vue'
 import type { Note, Task } from '../../../../shared/types'
 
-// Regression test for the "adding a task creates two" bug.
+// Automatic checks for the opened post-it screen. Run them with "npm test".
 //
-// Root cause: the "tap to add…" input had both @keyup.enter and @blur
-// wired to confirmAddTask. Pressing Enter ran confirmAddTask, which set
-// isAddingTask = false *before* the createTask IPC call resolved. Vue
-// reacted to that by unmounting the (still-focused) input immediately,
-// and removing a focused element from the DOM fires a native blur event -
-// which fired confirmAddTask a second time with the same leftover title,
-// creating a second task via a second IPC call.
+// These guard against an old bug: typing a task and pressing Enter used to
+// add it TWICE. Here's why. The "tap to add…" box saves your task both when
+// you press Enter AND when you click away from it. Pressing Enter saved the
+// task and closed the box. But closing a box you're typing in counts as
+// "clicking away", so it tried to save the same task a second time.
 //
-// This test exercises exactly that sequence (type title, press Enter,
-// let the unmount + its blur event play out) against a fake window.api,
-// so it fails the same way a real duplicate would: two createTask calls.
+// The test below copies exactly those steps (type, press Enter, the box
+// closes and "clicks away") and makes sure only ONE task is saved.
+// It uses a pretend window.api, so nothing is really saved anywhere.
+//
+// (Technical version, for developers: the input had both @keyup.enter and
+// @blur wired to confirmAddTask. Enter set isAddingTask = false before the
+// createTask call resolved, Vue unmounted the still-focused input, and
+// that fired a native blur, calling confirmAddTask a second time.)
 
+// A pretend post-it for the screen to show.
 const fakeNote: Note = {
   id: 1,
   noteDate: '2026-09-27',
@@ -29,11 +33,15 @@ const fakeNote: Note = {
   createdAt: '2026-09-27 00:00:00'
 }
 
+// Makes a pretend (not done) task on that post-it.
 function makeTask(id: number, title: string): Task {
   return { id, noteId: fakeNote.id, title, status: 'open', createdAt: '2026-09-27 00:00:00' }
 }
 
 describe('TodayScreen - adding a task', () => {
+  // Before every test: set up a pretend window.api. Loading gives back the
+  // pretend post-it with no tasks, and "create a task" just hands back a
+  // pretend task (while counting how many times it was asked).
   beforeEach(() => {
     let nextId = 100
     window.api = {
@@ -58,18 +66,17 @@ describe('TodayScreen - adding a task', () => {
     const input = wrapper.find('.add-row .task-text-input')
     await input.setValue('Write regression test')
 
-    // Enter triggers confirmAddTask, which flips isAddingTask to false and
-    // starts the (async) createTask call.
+    // Press Enter: this saves the task and closes the text box.
     await input.trigger('keyup.enter')
 
-    // In real Chromium (which Electron runs on), removing the still-focused
-    // input from the DOM at this point fires a native blur event - jsdom
-    // does not replicate that quirk, so we fire it ourselves to reproduce
-    // the exact sequence that caused the duplicate in the real app.
+    // In the real app, closing the box while you're typing in it counts as
+    // "clicking away". The pretend browser used for tests doesn't do that
+    // on its own, so we do it by hand, to copy exactly what the real app did.
     await input.trigger('blur')
     await flushPromises()
     await flushPromises() // let the createTask promise itself resolve too
 
+    // Saved exactly once, and exactly one task shows on screen.
     expect(window.api.createTask).toHaveBeenCalledTimes(1)
     expect(wrapper.findAll('.task-row').length).toBe(2) // 1 real task + the add-row
   })
@@ -86,11 +93,14 @@ describe('TodayScreen - adding a task', () => {
     await flushPromises()
     await flushPromises()
 
+    // Nothing saved, and no task shows on screen.
     expect(window.api.createTask).not.toHaveBeenCalled()
     expect(wrapper.findAll('.task-row').length).toBe(1) // just the add-row
   })
 })
 
+// Waits a moment, so anything the screen is still busy doing (loading,
+// saving...) gets to finish before we check the results.
 function flushPromises(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0))
 }

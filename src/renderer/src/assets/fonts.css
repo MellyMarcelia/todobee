@@ -1,5 +1,8 @@
 /* The fonts are stored inside the app, so it works without internet. */
 
+/* Nunito: the main font for everyday text. One file covers every weight,
+   from normal to extra bold. "swap" means text shows straight away in a
+   backup font while this one loads, instead of staying invisible. */
 @font-face {
   font-family: 'Nunito';
   font-style: normal;
@@ -8,6 +11,7 @@
   src: url('./fonts/Nunito-Variable.woff2') format('woff2');
 }
 
+/* Sniglet (normal weight): the round, bubbly font used for headings. */
 @font-face {
   font-family: 'Sniglet';
   font-style: normal;
@@ -16,6 +20,7 @@
   src: url('./fonts/Sniglet-Regular.woff2') format('woff2');
 }
 
+/* Sniglet (extra bold): the thicker version of the heading font. */
 @font-face {
   font-family: 'Sniglet';
   font-style: normal;

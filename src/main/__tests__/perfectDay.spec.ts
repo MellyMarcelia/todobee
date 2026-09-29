@@ -1,19 +1,28 @@
+// Automatic checks for the "good job" stamp rule (perfectDay.ts): a
+// post-it earns it only when it has tasks and every one is done. Run them
+// with "npm test".
+//
+// These tests never touch your real saved data. Each one uses a fresh,
+// throwaway database that only exists in memory while the test runs.
 import { describe, it, expect, beforeEach } from 'vitest'
 import Database from 'better-sqlite3'
 import { createSchema } from '../schema'
 import { recalculatePerfectDay } from '../perfectDay'
 
+// Makes a fresh, empty throwaway database with all the tables set up.
 function makeDb(): Database.Database {
   const db = new Database(':memory:')
   createSchema(db)
   return db
 }
 
+// Quickly adds a post-it on a given day, and gives back its id number.
 function insertNote(db: Database.Database, noteDate: string): number {
   return db.prepare('INSERT INTO notes (note_date) VALUES (?)').run(noteDate)
     .lastInsertRowid as number
 }
 
+// Quickly adds a task (done or not), and gives back its id number.
 function insertTask(
   db: Database.Database,
   noteId: number,
@@ -25,6 +34,7 @@ function insertTask(
     .run(noteId, title, status).lastInsertRowid as number
 }
 
+// Reads straight from the database whether a post-it has the stamp saved.
 function readPerfectDay(db: Database.Database, noteId: number): boolean {
   const row = db.prepare('SELECT perfect_day FROM notes WHERE id = ?').get(noteId) as {
     perfect_day: number
@@ -35,6 +45,7 @@ function readPerfectDay(db: Database.Database, noteId: number): boolean {
 describe('recalculatePerfectDay', () => {
   let db: Database.Database
 
+  // Before every test: start again with a brand-new empty database.
   beforeEach(() => {
     db = makeDb()
   })

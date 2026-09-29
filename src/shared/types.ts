@@ -7,6 +7,7 @@ export const DEFAULT_NOTE_COLOUR = '#F6C56A'
 
 /** One post-it. A day can have several of them. */
 export interface Note {
+  /** Its unique number, given by the database. */
   id: number
   /** Which day the post-it belongs to, e.g. "2026-09-27". */
   noteDate: string
@@ -21,6 +22,7 @@ export interface Note {
   /** Where you dragged it to on the board. Empty (null) until you've moved it once. */
   boardX: number | null
   boardY: number | null
+  /** When it was made. Used to keep post-its in the order you made them. */
   createdAt: string
 }
 
@@ -34,10 +36,14 @@ export type TaskStatus = 'open' | 'done'
 
 /** One line on a post-it. */
 export interface Task {
+  /** Its unique number, given by the database. */
   id: number
+  /** Which post-it it's on (that post-it's id number). */
   noteId: number
+  /** What the task says, e.g. "buy milk". */
   title: string
   status: TaskStatus
+  /** When it was added. Used to keep tasks in the order you wrote them. */
   createdAt: string
 }
 
@@ -53,10 +59,13 @@ export interface NewTask {
  * changed.
  */
 export interface DayResult {
+  /** Every post-it on that day. */
   notes: BoardNote[]
+  /** The friendly date shown at the top, e.g. "Sun 27 Sep 2026". */
   dateLabel: string
   dayOffset: number
   isToday: boolean
+  /** True for any day before today (those are locked). */
   isPast: boolean
 }
 

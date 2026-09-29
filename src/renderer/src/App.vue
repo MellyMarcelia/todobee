@@ -35,12 +35,17 @@ onUnmounted(() => {
 </script>
 
 <template>
+  <!-- Only one of these three screens shows at a time. -->
+
+  <!-- The board. Clicking a post-it opens it; the gear opens Settings. -->
   <BoardScreen
     v-if="currentScreen === 'board'"
     @open="openNote"
     @open-settings="currentScreen = 'settings'"
   />
+  <!-- Settings. The back arrow goes back to the board. -->
   <SettingsScreen v-else-if="currentScreen === 'settings'" @back="currentScreen = 'board'" />
+  <!-- One opened post-it. The back arrow (or ✓) goes back to the board. -->
   <TodayScreen
     v-else-if="openedNoteId !== undefined"
     :note-id="openedNoteId"

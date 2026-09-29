@@ -1,5 +1,11 @@
+# Tells code editors how to format files in this project, so everyone's
+# editor behaves the same.
+# "root = true" means: these are the only settings, don't look further up.
 root = true
 
+# For every file: normal text encoding, indent with 2 spaces, Mac/Linux
+# style line endings, always end with an empty line, and remove stray
+# spaces at the end of lines.
 [*]
 charset = utf-8
 indent_style = space

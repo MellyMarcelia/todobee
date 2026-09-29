@@ -41,11 +41,16 @@ const api = {
 }
 
 // Hand the list above to the screens as window.api.
+// Normally the screens are walled off from the rest of the app for safety
+// ("context isolation"), so we pass the list through the proper safe door.
+// If that wall is switched off, we just stick the list straight onto the
+// window instead.
 if (process.contextIsolated) {
   try {
     contextBridge.exposeInMainWorld('electron', electronAPI)
     contextBridge.exposeInMainWorld('api', api)
   } catch (error) {
+    // If something goes wrong here, write it down for developers.
     console.error(error)
   }
 } else {

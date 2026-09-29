@@ -1,3 +1,5 @@
+# Files and folders Prettier (the code tidier) should leave alone:
+# built files, the lock file, the licence, and the tsconfig files.
 out
 dist
 pnpm-lock.yaml

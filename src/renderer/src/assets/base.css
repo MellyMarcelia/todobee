@@ -32,6 +32,8 @@
   --font-body: 'Nunito', 'Segoe UI', sans-serif;
 }
 
+/* Start every element from a clean slate: no surprise gaps, and an element's size includes its
+   border. */
 *,
 *::before,
 *::after {
@@ -40,10 +42,12 @@
   font-weight: normal;
 }
 
+/* Lists have no bullet points unless we add them. */
 ul {
   list-style: none;
 }
 
+/* The whole page: cream background, the main font, and smoother-looking text. */
 body {
   min-height: 100vh;
   color: var(--color-text);
@@ -56,6 +60,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Headings use the rounder, bubbly heading font. */
 h1,
 h2,
 h3 {

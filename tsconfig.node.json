@@ -1,8 +1,14 @@
+// Type-checker settings for the behind-the-scenes half of the app (main,
+// preload, shared), which runs like a normal program on your computer.
 {
+  // Start from the standard settings for this kind of Electron app.
   "extends": "@electron-toolkit/tsconfig/tsconfig.node.json",
+  // Which files this covers.
   "include": ["electron.vite.config.*", "src/main/**/*", "src/preload/**/*", "src/shared/**/*"],
   "compilerOptions": {
+    // Lets this file be one "half" linked from tsconfig.json.
     "composite": true,
+    // Know about the extra things the build tool provides.
     "types": ["electron-vite/node"]
   }
 }
